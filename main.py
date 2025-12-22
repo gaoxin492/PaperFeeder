@@ -59,31 +59,54 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
 
 
 async def filter_papers(papers: List[Paper], config: Config) -> List[Paper]:
-    """Apply filters to select relevant papers."""
+    """Apply filters to select relevant papers.
+    
+    Stage 1: Keyword filter (title + abstract)
+    Stage 2: LLM filter (title + abstract + authors) - uses cheaper model
+    """
     print(f"\n🔍 Filtering {len(papers)} papers...")
     
-    # Stage 1: Keyword filter (fast, free)
+    # Stage 1: Keyword filter (fast, free) - matches keywords in title + abstract
     keyword_filter = KeywordFilter(
         keywords=config.keywords,
         exclude_keywords=config.exclude_keywords
     )
     filtered = keyword_filter.filter(papers)
-    print(f"   After keyword filter: {len(filtered)} papers")
+    print(f"   ✓ Keyword filter: {len(filtered)} papers (matched title/abstract)")
     
-    # Stage 2: LLM filter (optional, for fine-grained selection)
+    # Stage 2: LLM filter (uses cheaper model) - evaluates title + abstract + authors
     if config.llm_filter_enabled and len(filtered) > config.llm_filter_threshold:
-        print(f"   Applying LLM filter (threshold: {config.llm_filter_threshold})...")
+        # Use filter-specific API key if provided, otherwise use main LLM API key
+        filter_api_key = config.llm_filter_api_key
+        filter_base_url = config.llm_filter_base_url
+        filter_model = config.llm_filter_model
+        
+        print(f"   🤖 Applying LLM filter ({filter_model} @ {filter_base_url})...")
         llm_filter = LLMFilter(
-            api_key=config.anthropic_api_key,
-            research_interests=config.research_interests
+            api_key=filter_api_key,
+            research_interests=config.research_interests,
+            base_url=filter_base_url,
+            model=filter_model
         )
         filtered = await llm_filter.filter(filtered, max_papers=config.max_papers)
-        print(f"   After LLM filter: {len(filtered)} papers")
+        print(f"   ✓ LLM filter: {len(filtered)} papers selected")
+        
+        # Show top papers with reasons if available
+        if filtered and hasattr(filtered[0], 'filter_reason'):
+            print(f"   📌 Top picks:")
+            for i, paper in enumerate(filtered, 1):
+                reason = getattr(paper, 'filter_reason', '')
+                score = getattr(paper, 'relevance_score', 0) * 10
+                print(f"      {i}. [{score:.1f}/10] {paper.title[:50]}...")
+                if reason:
+                    print(f"         → {reason[:60]}...")
+    elif config.llm_filter_enabled:
+        print(f"   ⏭️  Skipping LLM filter (only {len(filtered)} papers, threshold: {config.llm_filter_threshold})")
     
-    # Limit total papers
+    # Final limit
     if len(filtered) > config.max_papers:
         filtered = filtered[:config.max_papers]
-        print(f"   Trimmed to max: {len(filtered)} papers")
+        print(f"   ✂️  Trimmed to max: {len(filtered)} papers")
     
     return filtered
 
@@ -93,17 +116,26 @@ async def summarize_papers(papers: list[Paper], config: Config) -> str:
     print(f"\n📝 Summarizing {len(papers)} papers...")
     print(f"   Using: {config.llm_model} @ {config.llm_base_url}")
     
+    # 从环境变量或配置读取调试选项（可选）
+    debug_save_pdfs = getattr(config, 'debug_save_pdfs', False)
+    debug_pdf_dir = getattr(config, 'debug_pdf_dir', 'debug_pdfs')
+    pdf_max_pages = getattr(config, 'pdf_max_pages', 10)  # 默认只提取前10页
+    
     summarizer = PaperSummarizer(
         api_key=config.llm_api_key,
         base_url=config.llm_base_url,
         model=config.llm_model,
-        research_interests=config.research_interests
+        research_interests=config.research_interests,
+        debug_save_pdfs=debug_save_pdfs,
+        debug_pdf_dir=debug_pdf_dir,
+        pdf_max_pages=pdf_max_pages
     )
     
+    # 使用PDF多模态输入（如果模型支持，更高效且token更少）
+    # extract_fulltext配置现在控制是否使用PDF多模态
     report = await summarizer.generate_report(
         papers,
-        include_full_paper=config.extract_fulltext,
-        top_n_full=config.fulltext_top_n
+        use_pdf_multimodal=config.extract_fulltext,  # 如果为True，使用PDF多模态
     )
     print("   Summary generated!")
     return report

@@ -82,13 +82,22 @@ class Config:
     """
     
     # Filtering settings
-    llm_filter_enabled: bool = False  # Enable for fine-grained filtering
-    llm_filter_threshold: int = 30    # Only use LLM filter if > N papers
+    llm_filter_enabled: bool = True   # Enable LLM-based filtering (recommended)
+    llm_filter_threshold: int = 5     # Only use LLM filter if > N papers after keyword filter
     max_papers: int = 20              # Max papers in final report
     
-    # Full text extraction
-    extract_fulltext: bool = True     # Extract PDF full text
-    fulltext_top_n: int = 5           # Only extract for top N papers (saves time/tokens)
+    # LLM Filter settings (use cheaper model for filtering)
+    llm_filter_api_key: str = ""      # API key for filter LLM (defaults to llm_api_key if empty)
+    llm_filter_base_url: str = "https://api.openai.com/v1"  # Base URL for filter LLM
+    llm_filter_model: str = "gpt-4o-mini"  # Cheaper model for filtering (e.g., gpt-4o-mini, gpt-3.5-turbo)
+    
+    # PDF Multimodal Input (more efficient than text extraction)
+    extract_fulltext: bool = True     # Use PDF multimodal input (direct PDF to model, saves tokens)
+                                      # If True and model supports (Claude/Gemini), sends PDF directly
+                                      # If False, only uses abstract
+    fulltext_top_n: int = 5           # Deprecated, kept for compatibility
+    pdf_max_pages: int = 10           # Maximum pages to extract from PDF (0 = all pages, default: 10)
+                                      # Only first N pages are sent to LLM to save tokens
     
     # Manual source settings
     manual_source_enabled: bool = True
@@ -113,6 +122,9 @@ class Config:
             "llm_api_key": os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"),
             "llm_base_url": os.getenv("LLM_BASE_URL"),
             "llm_model": os.getenv("LLM_MODEL"),
+            "llm_filter_api_key": os.getenv("LLM_FILTER_API_KEY"),
+            "llm_filter_base_url": os.getenv("LLM_FILTER_BASE_URL"),
+            "llm_filter_model": os.getenv("LLM_FILTER_MODEL"),
             "resend_api_key": os.getenv("RESEND_API_KEY"),
             "email_to": os.getenv("EMAIL_TO"),
             "cloudflare_account_id": os.getenv("CLOUDFLARE_ACCOUNT_ID"),
@@ -120,9 +132,22 @@ class Config:
             "d1_database_id": os.getenv("D1_DATABASE_ID"),
         }
         
+        # Apply environment variable overrides (only if value is not None)
         for key, value in env_overrides.items():
-            if value:
+            if value is not None:
                 config_data[key] = value
+        
+        # Auto-detect base_url based on model if not explicitly set
+        if config_data.get("llm_filter_model") and not config_data.get("llm_filter_base_url"):
+            model = config_data["llm_filter_model"].lower()
+            if "deepseek" in model:
+                config_data["llm_filter_base_url"] = "https://api.deepseek.com/v1"
+            elif "claude" in model:
+                config_data["llm_filter_base_url"] = "https://api.anthropic.com/v1"
+            elif "gemini" in model:
+                config_data["llm_filter_base_url"] = "https://generativelanguage.googleapis.com/v1beta/openai"
+            elif "qwen" in model:
+                config_data["llm_filter_base_url"] = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         
         return cls(**config_data)
     
@@ -140,8 +165,12 @@ class Config:
             "llm_filter_enabled": self.llm_filter_enabled,
             "llm_filter_threshold": self.llm_filter_threshold,
             "max_papers": self.max_papers,
+            "llm_filter_api_key": self.llm_filter_api_key,
+            "llm_filter_base_url": self.llm_filter_base_url,
+            "llm_filter_model": self.llm_filter_model,
             "extract_fulltext": self.extract_fulltext,
             "fulltext_top_n": self.fulltext_top_n,
+            "pdf_max_pages": getattr(self, 'pdf_max_pages', 10),
             "manual_source_enabled": self.manual_source_enabled,
             "manual_source_path": self.manual_source_path,
         }

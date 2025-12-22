@@ -51,7 +51,7 @@ keywords:
   - latent reasoning
 
 # Keywords to exclude
-exclude_keywords: []
+exclude_keywords: [3D, medical, 4D, video]
 
 # =============================================================================
 # Your research interests (for LLM filtering and summarization)
@@ -72,15 +72,19 @@ research_interests: |
 # =============================================================================
 # Filtering settings
 # =============================================================================
-llm_filter_enabled: false    # Enable LLM-based filtering (costs API calls)
-llm_filter_threshold: 20     # Only use LLM filter if more than N papers
-max_papers: 5               # Maximum papers in final report
+llm_filter_enabled: true     # Enable LLM-based filtering (推荐开启)
+llm_filter_threshold: 3      # 关键词筛选后，如果论文数 > N，则使用LLM筛选
+max_papers: 3               # Maximum papers in final report
 
 # =============================================================================
-# Full text extraction (PDF → text for deeper analysis)
+# PDF Multimodal Input (直接传PDF给模型，更高效)
 # =============================================================================
-extract_fulltext: false      # 是否提取全文传给 LLM
-fulltext_top_n: 3            # 只对前 N 篇提取 (省时间和 token)
+extract_fulltext: true      # 是否使用PDF多模态输入（直接传PDF文件，不提取文本）
+                             # 如果为true且模型支持（Claude/Gemini），会直接传PDF，token更少
+                             # 如果为false，只使用摘要（abstract）
+fulltext_top_n: 3            # 已废弃，保留用于兼容性
+pdf_max_pages: 15            # PDF最大页数（0=全部，默认10页）
+                              # 只提取前N页传给LLM，避免附录太长浪费token
 
 # =============================================================================
 # Manual paper source

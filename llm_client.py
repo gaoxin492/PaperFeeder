@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import httpx
+import aiohttp
 from openai import OpenAI, AsyncOpenAI
 from typing import Optional, Union, List
 from pathlib import Path
@@ -61,9 +62,15 @@ class LLMClient:
         base_url: str = "https://api.openai.com/v1",
         model: str = "gpt-4o-mini",
         timeout: int = 120,
+        debug_save_pdfs: bool = False,  # 是否保存PDF到本地用于调试
+        debug_pdf_dir: str = "debug_pdfs",  # PDF保存目录
+        pdf_max_pages: int = 10,  # PDF最大页数（0表示不限制）
     ):
         self.model = model
         self.base_url = base_url
+        self.debug_save_pdfs = debug_save_pdfs
+        self.debug_pdf_dir = debug_pdf_dir
+        self.pdf_max_pages = pdf_max_pages
         
         # 检测是否是 Anthropic API（需要特殊处理）
         self.is_anthropic = "anthropic.com" in base_url
@@ -131,6 +138,166 @@ class LLMClient:
                 temperature=temperature,
             )
             return response.choices[0].message.content
+    
+    async def achat_with_pdf(
+        self,
+        prompt: str,
+        pdf_path: Optional[str] = None,
+        pdf_url: Optional[str] = None,
+        pdf_base64: Optional[str] = None,
+        max_tokens: int = 4000,
+    ) -> str:
+        """
+        Chat with a PDF document (async version).
+        
+        Args:
+            prompt: The user prompt
+            pdf_path: Local path to PDF file
+            pdf_url: URL to PDF (will be downloaded)
+            pdf_base64: Base64-encoded PDF content
+            max_tokens: Maximum response tokens
+        """
+        # Get PDF as base64
+        if pdf_base64:
+            pdf_data = pdf_base64
+        elif pdf_path:
+            pdf_data = self._file_to_base64(pdf_path)
+        elif pdf_url:
+            pdf_data = await self._url_to_base64_async(
+                pdf_url, 
+                save_debug=getattr(self, 'debug_save_pdfs', False),
+                debug_dir=getattr(self, 'debug_pdf_dir', 'debug_pdfs'),
+                max_pages=getattr(self, 'pdf_max_pages', 10)
+            )
+            if pdf_data is None:
+                raise ValueError(f"Failed to download PDF from {pdf_url}")
+        else:
+            raise ValueError("Must provide pdf_path, pdf_url, or pdf_base64")
+        
+        if self.is_anthropic:
+            # Anthropic native PDF support
+            messages = [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": pdf_data,
+                        }
+                    },
+                    {"type": "text", "text": prompt}
+                ]
+            }]
+            response = await self.async_client.messages.create(
+                model=self.model,
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+            return response.content[0].text
+        
+        elif self.supports_pdf_native():
+            # Gemini-style (via OpenAI compat, may vary)
+            messages = [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "file",
+                        "file": {
+                            "filename": "paper.pdf",
+                            "file_data": f"data:application/pdf;base64,{pdf_data}"
+                        }
+                    },
+                    {"type": "text", "text": prompt}
+                ]
+            }]
+            return await self.achat(messages, max_tokens=max_tokens)
+        
+        else:
+            # Fallback: extract text and send as text
+            text = self._extract_pdf_text_from_base64(pdf_data)
+            messages = [{
+                "role": "user", 
+                "content": f"{prompt}\n\n---\nPaper content:\n{text[:30000]}"
+            }]
+            return await self.achat(messages, max_tokens=max_tokens)
+    
+    async def achat_with_multiple_pdfs(
+        self,
+        prompt: str,
+        pdf_urls: List[str],
+        max_tokens: int = 4000,
+    ) -> tuple[str, List[int]]:
+        """
+        Chat with multiple PDF documents (async).
+        Only works with models that support multiple documents in one message.
+        
+        Args:
+            prompt: The user prompt
+            pdf_urls: List of PDF URLs
+            max_tokens: Maximum response tokens
+        
+        Returns:
+            Tuple of (response_text, list_of_failed_indices)
+        """
+        if not pdf_urls:
+            raise ValueError("Must provide at least one PDF URL")
+        
+        # Download all PDFs
+        pdf_data_list = []
+        failed_indices = []
+        
+        for i, url in enumerate(pdf_urls):
+            pdf_data = await self._url_to_base64_async(
+                url, 
+                save_debug=getattr(self, 'debug_save_pdfs', False),
+                max_pages=getattr(self, 'pdf_max_pages', 10)
+            )
+            if pdf_data is None:
+                failed_indices.append(i)
+                pdf_data_list.append(None)
+            else:
+                pdf_data_list.append(pdf_data)
+        
+        # 检查是否有成功的PDF
+        successful_pdfs = [d for d in pdf_data_list if d is not None]
+        if not successful_pdfs:
+            raise ValueError("All PDF downloads failed")
+        
+        if self.is_anthropic:
+            # Anthropic supports multiple documents
+            content = []
+            for pdf_data in pdf_data_list:
+                if pdf_data is not None:
+                    content.append({
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": pdf_data,
+                        }
+                    })
+            
+            # 如果有失败的PDF，在prompt中说明
+            if failed_indices:
+                failed_note = f"\n\n注意：有 {len(failed_indices)} 篇论文的PDF下载失败，将仅基于摘要进行分析。"
+                prompt = prompt + failed_note
+            
+            content.append({"type": "text", "text": prompt})
+            
+            messages = [{"role": "user", "content": content}]
+            response = await self.async_client.messages.create(
+                model=self.model,
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+            return response.content[0].text, failed_indices
+        
+        else:
+            # For other models, fallback to processing one by one or text extraction
+            # This is a simplified fallback - you might want to implement batch processing
+            raise NotImplementedError("Multiple PDFs not yet supported for this model. Use achat_with_pdf for single PDFs.")
     
     def supports_pdf_native(self) -> bool:
         """Check if this model supports native PDF input."""
@@ -225,6 +392,79 @@ class LLMClient:
         response = httpx.get(url, follow_redirects=True, timeout=60)
         response.raise_for_status()
         return base64.standard_b64encode(response.content).decode("utf-8")
+    
+    async def _url_to_base64_async(
+        self, 
+        url: str, 
+        save_debug: bool = False, 
+        debug_dir: str = "debug_pdfs",
+        max_pages: int = 10
+    ) -> Optional[str]:
+        """Download URL and convert to base64 (async). Returns None if download fails.
+        
+        Args:
+            url: PDF URL to download
+            save_debug: If True, save PDF to local file for debugging
+            debug_dir: Directory to save debug PDFs
+            max_pages: Maximum number of pages to extract (default: 10, set to 0 for all pages)
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
+                    if response.status != 200:
+                        print(f"      ⚠️ PDF download failed: HTTP {response.status}")
+                        return None
+                    content = await response.read()
+                    
+                    # 简单检查是否是PDF
+                    if not content.startswith(b'%PDF'):
+                        print(f"      ⚠️ Downloaded content is not a valid PDF (doesn't start with %PDF)")
+                        return None
+                    
+                    # 如果指定了最大页数，提取前N页
+                    if max_pages > 0:
+                        try:
+                            import fitz  # PyMuPDF
+                            doc = fitz.open(stream=content, filetype="pdf")
+                            total_pages = len(doc)
+                            
+                            if total_pages > max_pages:
+                                # 创建新PDF，只包含前N页
+                                new_doc = fitz.open()
+                                new_doc.insert_pdf(doc, from_page=0, to_page=max_pages - 1)
+                                # 将新PDF保存到内存
+                                content = new_doc.tobytes()
+                                new_doc.close()
+                                print(f"      📄 Extracted first {max_pages} pages (total: {total_pages} pages)")
+                            else:
+                                print(f"      📄 PDF has {total_pages} pages (≤ {max_pages}, using all)")
+                            
+                            doc.close()
+                        except ImportError:
+                            print(f"      ⚠️ PyMuPDF not available, using full PDF")
+                        except Exception as e:
+                            print(f"      ⚠️ Failed to extract pages: {e}, using full PDF")
+                    
+                    # 调试：保存PDF到本地（如果启用）
+                    if save_debug:
+                        import os
+                        from pathlib import Path
+                        os.makedirs(debug_dir, exist_ok=True)
+                        # 从URL提取文件名
+                        filename = url.split('/')[-1].split('?')[0] or "paper.pdf"
+                        if not filename.endswith('.pdf'):
+                            filename += '.pdf'
+                        filepath = Path(debug_dir) / filename
+                        with open(filepath, 'wb') as f:
+                            f.write(content)
+                        print(f"      💾 Debug: PDF saved to {filepath} ({len(content)} bytes)")
+                    
+                    pdf_base64 = base64.standard_b64encode(content).decode("utf-8")
+                    print(f"      ✓ PDF processed: {len(content)} bytes -> base64 length: {len(pdf_base64)}")
+                    return pdf_base64
+        except Exception as e:
+            print(f"      ⚠️ PDF download failed for {url[:50]}...: {e}")
+            return None
     
     def _extract_pdf_text_from_base64(self, pdf_base64: str) -> str:
         """Extract text from base64-encoded PDF."""
