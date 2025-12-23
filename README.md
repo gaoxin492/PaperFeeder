@@ -89,7 +89,7 @@ EMAIL_FROM=papers@resend.dev
 EMAIL_TO=your@email.com
 ```
 
-### Run
+### Run Locally
 
 ```bash
 # Dry run (save report to HTML file)
@@ -101,6 +101,21 @@ python main.py
 # Fetch last 3 days
 python main.py --days 3
 ```
+
+### 📧 Automated Daily Delivery
+
+**Want daily paper digests delivered to your inbox automatically?**
+
+Use **GitHub Actions** for **FREE** automated deployment (no server needed):
+
+1. Fork this repository
+2. Add your API keys as GitHub Secrets
+3. Enable GitHub Actions
+4. Receive daily emails at 8 AM (configurable)
+
+**👉 See [DEPLOY.md](DEPLOY.md) for complete setup guide** (takes ~5 minutes)
+
+✨ **Recommended**: Start with `--dry-run` locally to test your configuration, then deploy to GitHub Actions for daily automation!
 
 ---
 
@@ -366,4 +381,11 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**⚡ Pro Tip**: Start with `--dry-run` to preview reports locally, then set up email delivery once you're happy with the filtering!
+**⚡ Pro Tip**: Start with `--dry-run` to preview reports locally, then follow [DEPLOY.md](DEPLOY.md) to set up **free automated daily delivery** via GitHub Actions!
+
+**🎯 Deployment**: For daily automated paper digests, see [DEPLOY.md](DEPLOY.md) for:
+- 🆓 **GitHub Actions** setup (recommended, no server needed)
+- 🖥️ Server deployment with cron jobs
+- 🐳 Docker containerization
+
+**Total setup time: ~5 minutes** ⏱️
