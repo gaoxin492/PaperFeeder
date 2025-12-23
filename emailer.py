@@ -27,7 +27,7 @@ class ResendEmailer(BaseEmailer):
     
     API_URL = "https://api.resend.com/emails"
     
-    def __init__(self, api_key: str, from_email: str = "papers@resend.dev"):
+    def __init__(self, api_key: str, from_email: str = "paperfeeder@resend.dev"):
         self.api_key = api_key
         self.from_email = from_email
     

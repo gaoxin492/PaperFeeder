@@ -2,7 +2,7 @@
 Data models for the paper assistant.
 """
 
-from __future__ import annotations  # 支持 Python 3.8+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -43,6 +43,7 @@ class Paper:
     # For filtering/ranking
     relevance_score: float = 0.0
     matched_keywords: List[str] = field(default_factory=list)
+    filter_reason: Optional[str] = None  # LLM筛选理由
     
     # For manual additions
     notes: Optional[str] = None
@@ -50,6 +51,9 @@ class Paper:
     
     # Full text (extracted from PDF)
     full_text: Optional[str] = None
+    
+    # External research/enrichment (NEW)
+    research_notes: Optional[str] = None  # 存储联网调研信息(GitHub stars, 社区评价等)
     
     def __hash__(self):
         return hash(self.arxiv_id or self.url)
@@ -72,7 +76,9 @@ class Paper:
             "pdf_url": self.pdf_url,
             "relevance_score": self.relevance_score,
             "matched_keywords": self.matched_keywords,
+            "filter_reason": self.filter_reason,
             "notes": self.notes,
+            "research_notes": self.research_notes,
         }
     
     @classmethod
@@ -94,7 +100,9 @@ class Paper:
             pdf_url=data.get("pdf_url"),
             relevance_score=data.get("relevance_score", 0.0),
             matched_keywords=data.get("matched_keywords", []),
+            filter_reason=data.get("filter_reason"),
             notes=data.get("notes"),
+            research_notes=data.get("research_notes"),
         )
 
 

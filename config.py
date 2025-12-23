@@ -32,7 +32,7 @@ class Config:
     # Email settings
     resend_api_key: str = ""
     email_to: str = ""
-    email_from: str = "papers@yourdomain.com"
+    email_from: str = "paperfeeder@resend.dev"
     
     # arXiv settings (fewer categories = faster queries)
     arxiv_categories: list[str] = field(default_factory=lambda: [
@@ -87,9 +87,11 @@ class Config:
     max_papers: int = 20              # Max papers in final report
     
     # LLM Filter settings (use cheaper model for filtering)
-    llm_filter_api_key: str = ""      # API key for filter LLM (defaults to llm_api_key if empty)
+    llm_filter_api_key: str = ""      # API key for filter LLM
     llm_filter_base_url: str = "https://api.openai.com/v1"  # Base URL for filter LLM
     llm_filter_model: str = "gpt-4o-mini"  # Cheaper model for filtering (e.g., gpt-4o-mini, gpt-3.5-turbo)
+
+    tavily_api_key: str = ""
     
     # PDF Multimodal Input (more efficient than text extraction)
     extract_fulltext: bool = True     # Use PDF multimodal input (direct PDF to model, saves tokens)
@@ -127,6 +129,7 @@ class Config:
             "llm_filter_model": os.getenv("LLM_FILTER_MODEL"),
             "resend_api_key": os.getenv("RESEND_API_KEY"),
             "email_to": os.getenv("EMAIL_TO"),
+            "tavily_api_key": os.getenv("TAVILY_API_KEY"),
             "cloudflare_account_id": os.getenv("CLOUDFLARE_ACCOUNT_ID"),
             "cloudflare_api_token": os.getenv("CLOUDFLARE_API_TOKEN"),
             "d1_database_id": os.getenv("D1_DATABASE_ID"),

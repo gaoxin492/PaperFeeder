@@ -1,3 +1,77 @@
+# PaperFeeder — Daily Paper Assistant
+
+PaperFeeder 自动从 arXiv、HuggingFace Daily Papers 和手动列表抓取论文，使用关键词与 LLM 进行粗筛与精筛，汇总成每日报告并通过邮件发送。适合研究者自动化跟踪感兴趣方向的新进展。
+
+- 语言：Python 3.10+
+- 目标：自动化抓取、筛选、基于 LLM 的评分与汇报生成
+
+主要功能
+- 从 `arXiv` 与 `HuggingFace Daily Papers` 拉取论文
+- 基于关键词的快速召回（title + abstract）
+- 基于 LLM 的粗筛（Coarse Filter）与精筛（Fine Filter）
+- 使用外部研究 API（Tavily）收集社区信号（可选）
+- 生成 HTML 报告并通过 Resend 发邮件（或保存为文件用于调试）
+
+快速开始
+1. 克隆并进入仓库
+
+```bash
+git clone <repo-url>
+cd PaperFeeder
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+2. 准备环境变量
+- 复制 `.env.example`（若存在）或在项目根目录创建 `.env`，填入你的 API keys：
+
+```
+LLM_API_KEY=...
+LLM_FILTER_API_KEY=...
+TAVILY_API_KEY=...
+RESEND_API_KEY=...
+EMAIL_TO=you@example.com
+```
+
+3. 配置 `config.yaml`
+- 复制 `config.example.yaml` 为 `config.yaml` 并根据需要调整关键词、类别与参数（如 `max_papers`、`llm_filter_enabled` 等）。
+
+运行
+- 本地 dry-run（不发邮件，仅生成并保存报告）：
+
+```bash
+python main.py --dry-run
+```
+
+- 正式运行（会发送邮件）：
+
+```bash
+python main.py
+```
+
+配置说明（重要字段）
+- `LLM_API_KEY` / `LLM_FILTER_API_KEY`：用于摘要与筛选的 LLM API Key（支持 OpenAI/Anthropic 等兼容后端）。
+- `TAVILY_API_KEY`：可选，若提供将使用 Tavily 的研究 API 获取社区信号（没有则降级为 mock researcher）。
+- `RESEND_API_KEY`：用于通过 Resend 发送邮件。
+- `EMAIL_TO`：接收报告的邮箱地址。
+- `config.yaml`：包含关键词、arXiv 分类、去重/数量上限、是否启用 LLM 过滤等可调参数。
+
+排查问题
+- 看不到 `TAVILY_API_KEY`：确认 `.env` 放在运行目录且 `TAVILY_API_KEY=...` 已设置；`config.py` 会自动加载 `.env` 并把该值注入 `Config`。
+- 报告包含旧论文：arXiv 使用 `published` 字段做过滤，HuggingFace 源可能不做截断，若见到历史论文，请检查 `config.days` 或在 `sources.py` 中添加日期过滤。
+- 网络超时 / arXiv 慢：arXiv 查询可能较慢，脚本里有重试与超时策略；必要时增大 `ClientTimeout` 或降低 `max_results`。
+
+开发与贡献
+- 代码风格：尽量保持清晰、类型注解与早期返回（guard clauses）。
+- 添加新数据源或研究 API 请在 `sources.py` / `researcher.py` 中新增类并遵循 `BaseSource` / `PaperResearcher` 接口。
+
+许可证
+- 请在此处填写你的许可证信息（例如 MIT）。
+
+更多帮助
+- 阅读 `DEPLOY.md` 获取 GitHub Actions / 部署指南，或打开 issue 说明你的问题与日志片段。
+
 # 📚 Daily Paper Assistant
 
 一个自动化的科研论文追踪助手，每天自动搜集、筛选、总结最新论文并发送到你的邮箱。

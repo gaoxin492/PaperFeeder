@@ -1,5 +1,6 @@
 # Daily Paper Assistant Configuration
-# Copy this file to config.yaml and customize
+# Persona: Senior Principal Researcher at a Top-Tier AI Lab
+# Philosophy: Hunt for "The Next Big Thing", despise incremental work.
 
 # =============================================================================
 # arXiv categories to monitor
@@ -13,81 +14,130 @@ arxiv_categories:
 
 # =============================================================================
 # Keywords for filtering (matches title + abstract)
-# Papers matching ANY keyword will be included
+# Strategy: Tier 1 = Precision Strikes, Tier 2 = Wide Net for Big News
 # =============================================================================
 keywords:
-  # Generative models
-  - diffusion model
-  - diffusion language
-  - flow matching
-  - generative model
-  - autoregressive
-  
-  # LLM reasoning
+  # --- Tier 1: Precision Strikes (高精度核心词，直接命中前沿) ---
+  - Reasoning
+  - hierarchical reasoning
+  - mathematical reasoning
   - chain of thought
-  - reasoning
-  - large language model
-  - in-context learning
-  
-  # Representation learning
-  - representation learning
-  - contrastive learning
-  - self-supervised
-  - foundation model
-  
-  # AI Safety
-  - ai safety
-  - alignment
-  - rlhf
-  - red teaming
-  - jailbreak
-  - safety benchmark
-  
-  # Specific interests
+  - diffusion language model      # Diffusion for discrete domains - hot frontier
+  - llada
+  - latent reasoning          # Reasoning in latent space, not token space
+  - mechanistic interpretability  # Understanding what's inside the black box
+  - test-time compute         # Scaling inference, not just training
+  - inference scaling         # Related to test-time compute
   - tokenizer
   - tokenization
-  - continuous token
-  - latent space
-  - latent reasoning
-
-# Keywords to exclude
-exclude_keywords: [3D, medical, 4D, video]
+  - system 2
+  
+  # --- Tier 2: Wide Net (泛化词，捕捉跨界大新闻，需配合 exclude 过滤噪音) ---
+  - LLM
+  - Large Language Model
+  - flow matching             # Next-gen generative paradigm
+  - Scaling Law
+  - Alignment
+  - Generative
+  - Foundation Model
+  - representation learning
 
 # =============================================================================
-# Your research interests (for LLM filtering and summarization)
+# Exclude Keywords (严格过滤，防止 Tier 2 词带来噪音)
+# =============================================================================
+exclude_keywords:
+  - self-play
+  - agent
+
+  # Application domains we don't care about
+  - medical
+  - biomedical
+  - clinical
+  - healthcare
+  - diagnosis
+  - pathology
+  - physicis
+  - neuroscience
+  
+  # Modalities outside our focus
+  - 3D
+  - 4D
+  - video generation
+  - video understanding
+  - audio
+  - speech
+  - music
+  - point cloud
+  - mesh
+  
+  # Hardware / Systems (not our lane)
+  - hardware
+  - fpga
+  - accelerator
+  - compiler
+  - inference engine
+  
+
+# =============================================================================
+# Research Interests (核心人设 - 决定 LLM 的品味和筛选标准)
 # =============================================================================
 research_interests: |
-  I'm a Master's student researching:
-  1. Generative models, especially diffusion models for language
-  2. LLM reasoning, including chain-of-thought and latent reasoning
-  3. Representation learning and continuous tokenization
-  4. AI safety, including benchmarks and alignment
+  You are a Senior Principal Researcher at a frontier AI lab (OpenAI/DeepMind/Anthropic caliber).
+  Your job is to screen papers for your team. You are EXTREMELY selective.
   
-  I'm particularly interested in papers that:
-  - Bridge generation and representation learning
-  - Propose new reasoning paradigms for LLMs
-  - Introduce novel safety evaluation methods
-  - Have strong mathematical foundations
+  ## What You're Hunting For: "The Next Big Thing"
+  
+  1. **Paradigm Shifts**: Papers that challenge existing dogmas, reveal counter-intuitive findings, 
+     or propose fundamentally new ways of thinking.
+  
+  2. **First-Principles Elegance**: Work with strong mathematical grounding, surprising simplicity, 
+     or beautiful unification of disparate ideas. You appreciate when someone removes complexity 
+     rather than adding it.
+
+  3. **Scaling Insights**: Papers that verify, challenge, or extend Scaling Laws. 
+     You care about what actually works at scale, not toy experiments.
+  
+  
+  ## Specific Technical Interests
+  
+  - **Generative Models**: 
+    - Unifying Autoregressive and Diffusion models.
+    - Discrete diffusion, Flow matching, and non-image modalities (Language, Planning).
+  - **Reasoning & System 2**: 
+    - Hierarchical Reasoning, Mathematical Reasoning, Chain of Thought, Latent Reasoning.
+    - Inference-time compute scaling (o1-like), Tree Search.
+  - **Representation Learning (JEPA)**: 
+    - **LeCun-style Joint Embedding Architectures (I-JEPA, V-JEPA)**.
+    - NOT interested in simple pixel-level reconstruction, such as video generation.
+  - **AI Safety & Alignment**: 
+    - Mechanistic Interpretability, transparency, Scalable Oversight, Weak-to-Strong Generalization.
+    - NOT interested in simple prompt-based jailbreaks.
+
+  ## What You DESPISE (Instant Pass)
+  
+  - **Resource Dumps**: Pure benchmarks or datasets without deep analysis of scaling laws or emergent capabilities. (Skip unless it reveals a major model failure mode).
+  - **Incremental SOTA Chasing**: "We beat the baseline by 0.3%" via hyperparameter tuning or "Alchemy" (random architectural tweaks).
+  - **Prompt Engineering as Research**: Simple prompt templates are not research. Only interested if it reveals internal mechanisms (like CoT).
+  - **"X applied to Y"**: Direct applications (e.g., LLM for Law/Finance) with no novel algorithmic contribution.
+  - **AI for Science/Bio**: Instant pass on protein folding, material science, or physics simulations UNLESS they propose a general-purpose ML advance (e.g., a new flow matching objective).
+  
 
 # =============================================================================
 # Filtering settings
 # =============================================================================
-llm_filter_enabled: true     # Enable LLM-based filtering (推荐开启)
-llm_filter_threshold: 3      # 关键词筛选后，如果论文数 > N，则使用LLM筛选
-max_papers: 3               # Maximum papers in final report
+llm_filter_enabled: true     # Enable LLM-based filtering
+llm_filter_threshold: 3      # Use LLM filter if keyword-filtered papers > N
+max_papers: 3                # Maximum papers in final report (slightly higher for flexibility)
 
 # =============================================================================
-# PDF Multimodal Input (直接传PDF给模型，更高效)
+# PDF Multimodal Input
 # =============================================================================
-extract_fulltext: true      # 是否使用PDF多模态输入（直接传PDF文件，不提取文本）
-                             # 如果为true且模型支持（Claude/Gemini），会直接传PDF，token更少
-                             # 如果为false，只使用摘要（abstract）
-fulltext_top_n: 3            # 已废弃，保留用于兼容性
-pdf_max_pages: 15            # PDF最大页数（0=全部，默认10页）
-                              # 只提取前N页传给LLM，避免附录太长浪费token
+extract_fulltext: true       # Use PDF multimodal input (more efficient)
+fulltext_top_n: 3            # Deprecated, kept for compatibility
+pdf_max_pages: 15            # Max PDF pages to extract (0 = all)
 
 # =============================================================================
 # Manual paper source
 # =============================================================================
-manual_source_enabled: true
+manual_source_enabled: false
 manual_source_path: "manual_papers.json"

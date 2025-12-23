@@ -1,172 +1,77 @@
-# GitHub Actions 部署指南
+# 部署指南（GitHub Actions / 本地测试）
 
-## 第一步：准备 API Keys
+本文档介绍如何把 PaperFeeder 部署到 GitHub Actions、在本地测试以及常见故障排查要点。适合希望每天自动生成并发送论文简报的研究者或团队。
 
-你需要准备以下 API Keys：
+1) 必备 API Keys（在仓库 Secrets 或本地 .env 中设置）
+- `LLM_API_KEY` 或 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`：主 LLM 用于摘要/合成（可选替代项）。
+- `LLM_FILTER_API_KEY`（可选）：用于更廉价的筛选模型（filter 阶段）。
+- `TAVILY_API_KEY`（可选）：用于获取社区信号的研究 API（没有则使用本地 mock researcher）。
+- `RESEND_API_KEY`：Resend 邮件服务 API key，用于发送报告。
+- `EMAIL_TO`：报告接收人邮箱地址。
 
-### 1. Anthropic API Key
-- 访问 https://console.anthropic.com/
-- 登录后在 API Keys 页面创建新 key
-- 格式: `sk-ant-api03-xxxxx`
-
-### 2. Resend API Key（邮件服务）
-- 访问 https://resend.com/
-- 免费账户每月 3000 封邮件
-- 创建账户后在 API Keys 页面获取
-- 格式: `re_xxxxx`
-
-### 3. 验证发件域名（可选但推荐）
-- 在 Resend 控制台添加你的域名
-- 或者使用默认的 `onboarding@resend.dev`（仅限测试）
-
----
-
-## 第二步：创建 GitHub 仓库
-
-### 方式 A：新建仓库
+2) 在 GitHub 上创建仓库并推送
 
 ```bash
-# 1. 解压项目
-unzip paper-assistant.zip
-cd paper-assistant
-
-# 2. 初始化 Git
 git init
 git add .
 git commit -m "Initial commit"
-
-# 3. 在 GitHub 创建新仓库（不要勾选 README）
-
-# 4. 推送
-git remote add origin https://github.com/YOUR_USERNAME/paper-assistant.git
+git remote add origin https://github.com/YOUR_USERNAME/paperfeeder.git
 git branch -M main
 git push -u origin main
 ```
 
-### 方式 B：Fork 现有仓库
-如果我发布到 GitHub，你可以直接 fork。
+3) 配置 GitHub Actions Secrets
+- 打开仓库 → Settings → Secrets and variables → Actions → New repository secret
+- 添加上面列出的 keys（键名全大写，如 `TAVILY_API_KEY`）。确保 `EMAIL_TO` 为正确的接收邮箱。
 
----
+4) 工作流与触发
+- 仓库可包含 `.github/workflows/daily-digest.yml`（示例已包含）。默认可按 schedule 定期触发，也可手动运行：
+  - Actions → Daily Paper Digest → Run workflow → 填写 `days_back` 或勾选 `dry_run`
+- 若需更改触发时间，调整 workflow 中的 `cron` 表达式。
 
-## 第三步：配置 GitHub Secrets
+5) 本地开发与测试（推荐先做）
 
-1. 打开你的 GitHub 仓库
-2. 点击 **Settings** → **Secrets and variables** → **Actions**
-3. 点击 **New repository secret**
-4. 添加以下 secrets：
-
-| Name | Value |
-|------|-------|
-| `ANTHROPIC_API_KEY` | `sk-ant-api03-xxxxx` |
-| `RESEND_API_KEY` | `re_xxxxx` |
-| `EMAIL_TO` | `your-email@example.com` |
-
-![GitHub Secrets 设置示意](https://docs.github.com/assets/cb-28270/images/help/repository/actions-secret-repository.png)
-
----
-
-## 第四步：启用 GitHub Actions
-
-1. 点击仓库的 **Actions** 标签
-2. 如果看到提示，点击 **I understand my workflows, go ahead and enable them**
-3. 你会看到 "Daily Paper Digest" workflow
-
----
-
-## 第五步：手动测试
-
-1. 在 Actions 页面，点击 **Daily Paper Digest**
-2. 点击右侧的 **Run workflow** 按钮
-3. 可以选择：
-   - `days_back`: 往前看几天的论文（默认 1）
-   - `dry_run`: 勾选则不发邮件，只生成报告
-
-![手动触发](https://docs.github.com/assets/images/help/repository/actions-manually-run-workflow.png)
-
----
-
-## 第六步：自定义定时
-
-编辑 `.github/workflows/daily-digest.yml`：
-
-```yaml
-on:
-  schedule:
-    # 每天北京时间早上 8:00 (UTC 0:00)
-    - cron: '0 0 * * *'
-    
-    # 或者每天 UTC 7:00
-    - cron: '0 7 * * *'
-```
-
-Cron 格式: `分钟 小时 日 月 星期`
-
-常用时间：
-- 北京时间 8:00 = `0 0 * * *` (UTC 0:00)
-- 北京时间 9:00 = `0 1 * * *` (UTC 1:00)
-- 美西时间 7:00 = `0 15 * * *` (UTC 15:00)
-
----
-
-## 第七步：自定义关键词
-
-编辑 `config.yaml` 文件中的 `keywords` 列表：
-
-```yaml
-keywords:
-  - diffusion model
-  - your specific topic
-  - another keyword
-```
-
-修改后 commit 并 push：
-```bash
-git add config.yaml
-git commit -m "Update keywords"
-git push
-```
-
----
-
-## 常见问题
-
-### Q: 邮件没收到？
-1. 检查垃圾邮件文件夹
-2. 在 Actions 页面查看运行日志
-3. 确认 Resend 账户已验证邮箱
-
-### Q: 运行失败？
-查看 Actions 页面的日志，常见原因：
-- API Key 配置错误
-- 网络超时（arXiv 有时较慢）
-
-### Q: 如何查看运行历史？
-Actions → Daily Paper Digest → 查看所有运行记录
-
-### Q: 费用估算
-- **Anthropic API**: 每次运行约 $0.01-0.05（取决于论文数量）
-- **Resend**: 免费额度 3000 封/月
-- **GitHub Actions**: 免费额度 2000 分钟/月（私有仓库）或无限（公开仓库）
-
----
-
-## 本地开发
+- 安装依赖并创建虚拟环境：
 
 ```bash
-# 1. 安装依赖
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# 2. 创建 .env 文件
-cp .env.example .env
-# 编辑 .env 填入你的 API keys
-
-# 3. 创建配置
-cp config.example.yaml config.yaml
-# 编辑 config.yaml 自定义关键词
-
-# 4. 测试运行
-python main.py --dry-run
-
-# 5. 正式运行
-python main.py
 ```
+
+- 在项目根创建 `.env` 并填写 keys，或直接在 CI secrets 中设置（注意本地测试需要 .env）：
+
+```
+LLM_API_KEY=...
+LLM_FILTER_API_KEY=...
+TAVILY_API_KEY=...
+RESEND_API_KEY=...
+EMAIL_TO=you@example.com
+```
+
+- 运行 dry-run（不会发送邮件，只会保存报告到 `report_preview.html`）：
+
+```bash
+python main.py --dry-run
+```
+
+6) 常见问题与排查
+- 启动时报 `TAVILY_API_KEY not found`：
+  - 确认 `.env` 在运行目录且包含 `TAVILY_API_KEY=...`，或者在 GitHub Secrets 中正确设置。`config.py` 会自动加载 `.env`（通过 `load_dotenv()`）。
+- 报告包含旧论文：
+  - arXiv 在 `sources.py` 中使用 `published` 字段做过滤，但 HuggingFace 源可能没有严格日期截断。可通过运行时参数 `--days` 调整回溯天数，或在 `sources.py` 为 HuggingFace 加入日期过滤。
+- arXiv 响应慢或超时：
+  - arXiv 查询可能需要 10–60s，脚本内有重试与较长的超时限制。可减少 `max_results` 或增加超时。
+- 邮件未收到：
+  - 在 Actions 日志中查看 `emailer` 相关输出；确认 `RESEND_API_KEY` 与 `EMAIL_TO` 设置正确并检查垃圾箱；可先使用 `--dry-run` 保存 HTML，确认内容正常。
+
+7) 可选改进与扩展
+- 更严格的日期过滤：在 `HuggingFaceSource.fetch()` 中对 `publishedAt` 做 cutoff（与 `ArxivSource` 一致）。
+- 添加新数据源：在 `sources.py` 新增 `BaseSource` 子类并在 `main.fetch_papers()` 注册。
+- 集成更多研究 API：在 `researcher.py` 中实现 `PaperResearcher`（例如替换或扩展 Tavily）。
+
+如果你希望，我可以：
+- 生成或更新 `.github/workflows/daily-digest.yml` 的示例 workflow；
+- 在日志中增加启动时的密钥存在检测（只打印是否存在，不泄露密钥）。
+
+
