@@ -1,5 +1,6 @@
 """
 Configuration management for the paper assistant.
+Updated: Added blog source configuration support.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from dotenv import load_dotenv
 # 自动加载 .env 文件
 load_dotenv()
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 
 @dataclass
@@ -101,9 +102,28 @@ class Config:
     pdf_max_pages: int = 10           # Maximum pages to extract from PDF (0 = all pages, default: 10)
                                       # Only first N pages are sent to LLM to save tokens
     
-    # Manual source settings
+    # Source enablement settings
+    papers_enabled: bool = True            # Enable fetching from paper sources (arXiv, HF, Manual)
     manual_source_enabled: bool = True
     manual_source_path: str = "manual_papers.json"  # Or D1 connection string
+    
+    # =============================================================================
+    # Blog Source Settings (NEW!)
+    # =============================================================================
+    blogs_enabled: bool = True        # Enable blog fetching from RSS feeds
+    blog_days_back: int = 1           # How many days back to look for blog posts
+    
+    # Which blogs to enable (if None, uses all priority blogs)
+    # Available keys: openai, anthropic, deepmind, google_ai, meta_ai,
+    #                 bair, stanford_ai, karpathy, lilianweng, colah,
+    #                 jay_alammar, distill, fastai, the_gradient,
+    #                 nvidia_ai, microsoft_research, aws_ml,
+    #                 alignment_forum, lesswrong_ai
+    enabled_blogs: Optional[List[str]] = None
+    
+    # Custom blogs (add your own RSS feeds)
+    # Format: {"key": {"name": "...", "feed_url": "...", "priority": True/False}}
+    custom_blogs: Optional[Dict[str, Dict[str, Any]]] = None
     
     # D1 settings (for future chatbot integration)
     cloudflare_account_id: str = ""
@@ -133,12 +153,27 @@ class Config:
             "cloudflare_account_id": os.getenv("CLOUDFLARE_ACCOUNT_ID"),
             "cloudflare_api_token": os.getenv("CLOUDFLARE_API_TOKEN"),
             "d1_database_id": os.getenv("D1_DATABASE_ID"),
+            # Source enablement
+            "papers_enabled": os.getenv("PAPERS_ENABLED"),
+            # Blog settings from environment
+            "blogs_enabled": os.getenv("BLOGS_ENABLED"),
+            "blog_days_back": os.getenv("BLOG_DAYS_BACK"),
         }
         
         # Apply environment variable overrides (only if value is not None)
         for key, value in env_overrides.items():
             if value is not None:
-                config_data[key] = value
+                # Handle boolean conversion for source enablement
+                if key in ("blogs_enabled", "papers_enabled"):
+                    config_data[key] = value.lower() not in ("false", "0", "no", "off")
+                # Handle int conversion for blog_days_back
+                elif key == "blog_days_back":
+                    try:
+                        config_data[key] = int(value)
+                    except ValueError:
+                        pass
+                else:
+                    config_data[key] = value
         
         # Auto-detect base_url based on model if not explicitly set
         if config_data.get("llm_filter_model") and not config_data.get("llm_filter_base_url"):
@@ -174,8 +209,14 @@ class Config:
             "extract_fulltext": self.extract_fulltext,
             "fulltext_top_n": self.fulltext_top_n,
             "pdf_max_pages": getattr(self, 'pdf_max_pages', 10),
+            "papers_enabled": self.papers_enabled,
             "manual_source_enabled": self.manual_source_enabled,
             "manual_source_path": self.manual_source_path,
+            # Blog settings
+            "blogs_enabled": self.blogs_enabled,
+            "blog_days_back": self.blog_days_back,
+            "enabled_blogs": self.enabled_blogs,
+            "custom_blogs": self.custom_blogs,
         }
         
         with open(path, "w") as f:

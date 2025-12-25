@@ -141,3 +141,83 @@ pdf_max_pages: 15            # Max PDF pages to extract (0 = all)
 # =============================================================================
 manual_source_enabled: false
 manual_source_path: "manual_papers.json"
+
+# =============================================================================
+# Blog Source Settings (NEW!)
+# =============================================================================
+# Enable blog fetching from RSS feeds
+blogs_enabled: true
+
+# How many days back to look for blog posts
+blog_days_back: 1
+
+# Which blogs to enable
+# If not specified (null), uses all priority blogs by default
+# Available keys: openai, anthropic, deepmind, google_ai, meta_ai,
+#                 bair, stanford_ai, karpathy, lilianweng, colah,
+#                 jay_alammar, distill, fastai, the_gradient,
+#                 nvidia_ai, microsoft_research, aws_ml,
+#                 alignment_forum, lesswrong_ai
+enabled_blogs:
+  # === 龙头实验室 & 工业界巨头 (Priority - 直接进入报告) ===
+  - openai            # OpenAI News & Research
+  - anthropic         # Anthropic News (注意: 需配合 User-Agent 抓取)
+  - deepmind          # Google DeepMind Blog
+  - google_ai         # Google AI (Technology/AI 频道)
+  - meta_research     # Meta Research (原 Meta AI Blog 的硬核替代源)
+  - huggingface       # Hugging Face Blog (开源 SOTA 动态)
+
+  # === 顶级学术实验室 (Priority) ===
+  - bair              # Berkeley AI Research (BAIR) Blog
+
+  # === 大佬个人博客 (Priority - 深度技术洞察) ===
+  - karpathy          # Andrej Karpathy (LLM 训练与思考)
+  - lilianweng        # Lil'Log (Lilian Weng @ OpenAI - 极其详尽的综述)
+  - colah             # Christopher Olah (模型可解释性/机械解释性)
+
+  # === 其他优质来源 (参与筛选流程 - 仅输出高质量摘要) ===
+  - nvidia_research   # NVIDIA Research (替代 NVIDIA Blog，关注底层论文)
+  - alignment_forum   # AI Alignment Forum (对齐领域深度讨论)
+  - lesswrong_ai      # LessWrong AI Tag (跨学科 AI 思考)
+
+
+# Custom blogs (add your own RSS feeds)
+# Format: key -> {name, feed_url, website, priority}
+# priority: true = 直接进入报告；false = 参与筛选流程
+custom_blogs:
+  # Example: Uncomment to add your own blogs
+  # my_favorite_blog:
+  #   name: "My Favorite AI Blog"
+  #   feed_url: "https://example.com/feed.xml"
+  #   website: "https://example.com/blog"
+  #   priority: true
+  
+  # Example: Company internal blog
+  # company_research:
+  #   name: "Company Research Blog"
+  #   feed_url: "https://company.com/research/rss"
+  #   priority: false
+
+# =============================================================================
+# Pre-configured Priority Blogs Reference
+# =============================================================================
+# These blogs are marked as "priority" by default and skip all filtering:
+#
+# AI Labs:
+#   openai      - https://openai.com/news/rss.xml
+#   anthropic   - https://www.anthropic.com/rss.xml
+#   deepmind    - https://deepmind.google/blog/rss.xml
+#   google_ai   - https://blog.google/technology/ai/rss/
+#   meta_ai     - https://ai.meta.com/blog/rss/
+#
+# Academic Labs:
+#   bair        - https://bair.berkeley.edu/blog/feed.xml
+#
+# Individual Researchers:
+#   karpathy    - https://karpathy.bearblog.dev/feed/
+#   lilianweng  - https://lilianweng.github.io/index.xml
+#   colah       - https://colah.github.io/rss.xml
+#   distill     - https://distill.pub/rss.xml
+#
+# Priority blogs go DIRECTLY to the report without filtering!
+# This ensures you never miss important updates from top AI labs.

@@ -5,7 +5,10 @@ Generates daily digest with summaries and insights.
 Persona: Senior Principal Researcher at a Top-Tier AI Lab
 Philosophy: Hunt for "The Next Big Thing", despise incremental work.
 
-UPGRADED: Now includes community signals (research_notes) in analysis.
+UPGRADED: 
+- Now includes community signals (research_notes) in analysis.
+- NEW: Supports blog posts from priority sources (OpenAI, Anthropic, etc.)
+- IMPROVED: Blog posts are selectively filtered (1-3 picks) with highlights and deep dive
 """
 
 from __future__ import annotations
@@ -43,7 +46,13 @@ class PaperSummarizer:
         )
         self.research_interests = research_interests
     
-    def _build_prompt(self, papers: list[Paper], papers_with_pdf: list[Paper] = None, failed_pdf_papers: list[Paper] = None) -> str:
+    def _build_prompt(
+        self, 
+        papers: list[Paper], 
+        papers_with_pdf: list[Paper] = None, 
+        failed_pdf_papers: list[Paper] = None,
+        blog_posts: list[Paper] = None,
+    ) -> str:
         """
         构建 Senior Principal Researcher 视角的 prompt。
         
@@ -52,10 +61,14 @@ class PaperSummarizer:
         - 犀利点评，拒绝废话
         - 中英文夹杂（专有名词英文）
         
-        UPGRADED: 现在包含 research_notes (社区信号)
+        UPGRADED:
+        - 现在包含 research_notes (社区信号)
+        - NEW: 支持博客帖子（来自 priority 源）
+        - IMPROVED: 博客筛选独立于论文，只在 Blog Highlights 和 Deep Dive 中出现
         """
         
         failed_pdf_set = set(failed_pdf_papers) if failed_pdf_papers else set()
+        blog_posts = blog_posts or []
         
         # 构建论文列表，包含 research_notes（社区信号）
         papers_info = []
@@ -86,6 +99,26 @@ class PaperSummarizer:
                 f"{community_signal}"
             )
         
+        # 构建博客帖子列表
+        blog_info = []
+        if blog_posts:
+            for i, post in enumerate(blog_posts, 1):
+                source = getattr(post, 'blog_source', 'Unknown')
+                # 去掉标题中的 [Blog] 前缀（如果有）
+                title = post.title
+                if title.startswith("[Blog] "):
+                    title = title[7:]
+                
+                # 提供更多内容供 LLM 判断
+                content_preview = post.abstract[:500] if post.abstract else "No content preview"
+                
+                blog_info.append(
+                    f"{i}. {title}\n"
+                    f"   Source: {source}\n"
+                    f"   URL: {post.url}\n"
+                    f"   Content: {content_preview}..."
+                )
+        
         pdf_context = ""
         if papers_with_pdf:
             successful_count = len(papers_with_pdf) - len(failed_pdf_set)
@@ -94,7 +127,7 @@ class PaperSummarizer:
                 pdf_context += f" ({len(failed_pdf_set)} failed, using abstract only)"
         
         # === SYSTEM PROMPT: Senior Principal Researcher Persona ===
-        system_prompt = """You are a Senior Principal Researcher at a top-tier AI lab (OpenAI/DeepMind/Anthropic caliber), screening papers for your research team.
+        system_prompt = """You are a Senior Principal Researcher at a top-tier AI lab (OpenAI/DeepMind/Anthropic caliber), screening papers AND blog posts for your research team.
 
 ## Your Philosophy
 - You DESPISE incremental work. "Beat SOTA by 0.2%" makes you yawn.
@@ -103,49 +136,116 @@ class PaperSummarizer:
 - You care about **what scales** and **what actually matters**.
 
 ## Your Evaluation Lens
-For each paper, you instinctively assess:
+For each paper AND blog post, you instinctively assess:
 - **Surprise (惊奇度)**: Does it challenge my priors? Is there an "aha" moment?
-- **Rigor (严谨度)**: Is the evaluation convincing, or is it cherry-picked toy experiments?
+- **Rigor (严谨度)**: Is the content substantive, or is it just marketing fluff?
 - **Impact (潜在影响)**: Could this change how we build systems? Or is it a footnote?
-- **Community Signal (社区信号)**: What do external signals say? High GitHub stars? Hot discussions? Or overhyped?
+- **Relevance (相关性)**: Is it actually about AI/ML research, or off-topic (health, product announcements, etc.)?
 
 ## Your Communication Style
 - 犀利、专业、不废话
 - 中英文夹杂（专有名词保留英文，如 "diffusion"、"scaling law"、"test-time compute"）
 - 你可以毒舌，但要有建设性
 - 直接给判断，不要 "on the other hand..." 这种模棱两可
-- **CRITICAL**: You MUST integrate community signals into your analysis when available"""
+
+## CRITICAL: Blog Post Filtering
+- NOT all blog posts are worth reading!
+- Filter OUT: marketing content, product announcements, off-topic posts (health, chemical hygiene, etc.)
+- Keep ONLY: technical deep dives, year-in-review posts, research insights, methodology discussions
+- A blog post from a famous source can still be SKIP-worthy if it's not about AI research"""
 
         # === USER PROMPT ===
-        user_prompt = f"""## My Research Interests
-{self.research_interests}
-
+        # Build the content sections
+        papers_section = ""
+        if papers:
+            papers_section = f"""
 ## Today's Paper Pool ({len(papers)} papers)
 {chr(10).join(papers_info)}{pdf_context}
+"""
+        
+        blogs_section = ""
+        if blog_posts:
+            blogs_section = f"""
+## 📝 Blog Posts from Priority Sources ({len(blog_posts)} posts)
+**NOTE: These need filtering too! Not all are worth reading.**
 
+{chr(10).join(blog_info)}
+"""
+
+        user_prompt = f"""## My Research Interests
+{self.research_interests}
+{blogs_section}{papers_section}
 ---
 
 ## Your Task
 
-请以 Senior Principal Researcher 的视角审阅这批论文，输出 **clean HTML**（不要 html/head/body 标签）。
+请以 Senior Principal Researcher 的视角审阅这批内容，输出 **clean HTML**（不要 html/head/body 标签）。
 
-**IMPORTANT**: When papers have 🔍 Community Signals, you MUST incorporate them into your analysis. Examples:
-- "虽然方法简单，但GitHub已获1k stars，Reddit上引发关于Scaling Law的激烈讨论"
-- "作者团队知名，但社区反馈指出reproducibility issues"
-- "看似incremental，但HuggingFace社区高度关注，可能有实用价值"
+**CRITICAL INSTRUCTIONS**:
+1. 博客也需要筛选！不是所有博客都值得读。过滤掉：marketing content、product announcements、与 AI 研究无关的内容。
+2. 只选出 **Top 1-3 篇最值得深读的博客**，并进行详细分析。
+3. 如果某天的博客都是 marketing fluff 或 off-topic，可以不选任何博客。
 
 ---
 
 ## Output Structure
+"""
 
-### Section 1: 🏆 Editor's Choice (Top 1-3)
+        # Blog section prompt (only if blogs exist)
+        if blog_posts:
+            user_prompt += """
+### Section 0: 📢 Blog Highlights (1-3 Picks)
 
-只选**真正值得读**的论文。没有就留空，不要凑数。
+从所有博客中筛选出 **1-3 篇最值得关注的**（不要硬凑数，不足3篇也没问题）。筛选标准：
+- ✅ 技术深度文章（如 Karpathy 的年度总结、技术 deep dive）
+- ✅ 研究方向洞察（如实验室的 research roadmap）
+- ✅ 方法论讨论（如 prompt injection 防御策略）
+- ❌ 纯 marketing/PR 内容（如 "Celebrating X customers"）
+- ❌ Product announcements（如 "60 AI announcements"）
+- ❌ 与 AI 研究无关的内容（如健康、化学品等）
+
+**如果没有值得关注的博客，这个 section 可以完全跳过，不要显示任何内容。**
+
+每篇入选博客只需 **1-2 句话简短总结**：
+- **Blog Title** (链接)
+- **Source**: 来源
+- **Summary**: 1-2句话说明这篇博客的核心内容和价值
+
+HTML 格式：
+```html
+<div class="blog-highlights">
+<h2>📢 Blog Highlights</h2>
+<p class="section-desc">Top picks from industry blogs — filtered for research value</p>
+
+<div class="blog-summary">
+<h3><a href="URL">Blog Title</a></h3>
+<p class="source">📍 Source Name</p>
+<p class="summary">1-2句话简短总结这篇博客的核心内容和价值...</p>
+</div>
+
+</div>
+```
+
+如果没有值得关注的博客：
+```html
+<div class="blog-highlights">
+<h2>📢 Blog Highlights</h2>
+<p class="no-highlights">今天的博客主要是 product announcements 和 marketing content，没有值得关注的技术内容。</p>
+</div>
+```
+
+---
+"""
+
+        # Papers section prompt
+        user_prompt += """
+### Section 1: 🏆 Editor's Choice (Top 1-3 Papers)
+
+只选**真正值得读的论文**（不包含博客）。没有就留空，不要凑数。
 
 每篇包含：
 - **Paper Title** (链接)
-- **Verdict**: 一句话犀利点评，说明为什么入选（或为什么差点没入选）
-  - **必须结合community signals**（如果有的话）
+- **Verdict**: 一句话犀利点评，说明为什么入选
 - **Signal**: 如果有社区热度/讨论，简要提及；没有就写 "N/A"
 
 HTML 格式：
@@ -154,7 +254,7 @@ HTML 格式：
 <h2>🏆 Editor's Choice</h2>
 <div class="choice-item">
 <h3><a href="URL">Paper Title</a></h3>
-<p class="verdict"><b>Verdict:</b> 一句话点评（必须提及community signal如果有）...</p>
+<p class="verdict"><b>Verdict:</b> 一句话点评...</p>
 <p class="signal"><b>Signal:</b> 社区热度/讨论...</p>
 </div>
 </div>
@@ -164,7 +264,7 @@ HTML 格式：
 ```html
 <div class="editors-choice">
 <h2>🏆 Editor's Choice</h2>
-<p class="no-choice">今天没有让我眼前一亮的论文。都是 incremental work。</p>
+<p class="no-choice">今天没有让我眼前一亮的论文。</p>
 </div>
 ```
 
@@ -172,52 +272,72 @@ HTML 格式：
 
 ### Section 2: 🔬 Deep Dive
 
-对 Editor's Choice 入选的论文进行深度分析。
+对 Editor's Choice 入选的**论文**和 Section 0 入选的**博客**进行深度分析。
 
+**论文分析**：
 每篇包含：
 - **👥 Authors**: 作者 + 单位（1行）
 - **🎯 The "Aha" Moment**: 这篇论文最反直觉/最有趣的点是什么？（2-3句）
-  - **如果有community signals，说明社区如何响应这个idea**
 - **🔧 Methodology**: 具体怎么做的？技术核心是什么？（3-4句，要有细节）
 - **📊 Reality Check**: 实验结果可信吗？有哪些 caveats？（2-3句，带数字）
-  - **如果community signals提到reproducibility，必须讨论**
 - **💡 My Take**: 作为 researcher，你会怎么行动？复现/引用/跟进/忽略？（1-2句）
-  - **结合community validation进行判断**
+
+**博客分析**：
+每篇包含：
+- **🎯 Why This Matters**: 为什么这篇博客值得深读（具体说明技术价值）
+- **📌 Key Insights**: 3-5 个核心观点/takeaways，要有具体内容
+- **🔗 Action Items**: 读完后你会做什么（关注方向、读相关论文等）
 
 HTML 格式：
 ```html
 <div class="deep-dive">
 <h2>🔬 Deep Dive</h2>
 
+<!-- 论文 Deep Dive -->
 <div class="paper">
 <h3 class="paper-title"><span class="badge high">🔥</span><a href="URL">Paper Title</a></h3>
 <div class="paper-body">
 <p class="authors">👥 Author1, Author2, ... | Institution1, Institution2</p>
-<p><b>🎯 The "Aha" Moment:</b> ... (integrate community response if available)</p>
+<p><b>🎯 The "Aha" Moment:</b> ...</p>
 <p><b>🔧 Methodology:</b> ...</p>
-<p><b>📊 Reality Check:</b> ... (mention reproducibility if discussed in community)</p>
-<p><b>💡 My Take:</b> ... (factor in community validation)</p>
+<p><b>📊 Reality Check:</b> ...</p>
+<p><b>💡 My Take:</b> ...</p>
+</div>
+</div>
+
+<!-- 博客 Deep Dive -->
+<div class="blog">
+<h3 class="blog-title"><span class="badge blog">📝</span><a href="URL">Blog Title</a></h3>
+<div class="blog-body">
+<p><b>🎯 Why This Matters:</b> 具体说明为什么值得深读...</p>
+<div class="insights">
+<p><b>📌 Key Insights:</b></p>
+<ul>
+<li><b>Insight 1:</b> 具体内容...</li>
+<li><b>Insight 2:</b> 具体内容...</li>
+<li><b>Insight 3:</b> 具体内容...</li>
+</ul>
+</div>
+<p><b>🔗 Action Items:</b> 读完后的行动...</p>
 </div>
 </div>
 
 </div>
 ```
 
-Badge 规则: `high` (🔥 paradigm-shifting), `medium` (⭐ solid contribution), `low` (📄 incremental)
+Badge 规则: `high` (🔥 paradigm-shifting), `medium` (⭐ solid contribution), `low` (📄 incremental), `blog` (📝 blog deep dive)
 
 ---
 
 ### Section 3: 🌀 Signals & Noise
 
-对**剩余论文**进行快速分类，不需要详细分析。
+对**剩余论文**中**有价值但不够突出**的进行快速标注。
 
-分为两类：
-- **[Worth Skimming]**: 有一些有趣的想法，但不够惊艳，可以快速翻翻
-  - 如果有positive community signals，值得一提
-- **[Pass]**: Incremental work，不需要浪费时间
-  - 如果有negative community signals（如reproducibility issues），可以提及
+只列出 **[Worth Skimming]** 的论文：
+- 有一些价值或有趣的点，可以快速翻翻
+- 每篇只需 1 句话说明为什么值得一看
 
-每篇只需 1 句话理由。
+**完全不提 Pass 的论文**（节省 token，不值得浪费注意力）。
 
 HTML 格式：
 ```html
@@ -227,14 +347,7 @@ HTML 格式：
 <div class="skim-list">
 <h4>📖 Worth Skimming</h4>
 <ul>
-<li><a href="URL">Paper Title</a> — 一句话理由（提及community signal如果relevant）</li>
-</ul>
-</div>
-
-<div class="pass-list">
-<h4>🚫 Pass</h4>
-<ul>
-<li><a href="URL">Paper Title</a> — 一句话为什么 pass</li>
+<li><a href="URL">Paper Title</a> — 一句话理由</li>
 </ul>
 </div>
 
@@ -245,228 +358,157 @@ HTML 格式：
 
 ## Critical Requirements
 
-1. **Be Ruthless**: 宁缺毋滥。如果今天没有好论文，Editor's Choice 可以是空的。
-2. **Be Specific**: 不要说 "interesting approach"，要说具体 interesting 在哪里。
-3. **Be Honest**: 如果你觉得一篇论文是 overhyped，直接说。
-4. **Numbers Matter**: Results 要带具体数字，不要 "significantly improves"。
+1. **博客也要筛选**: 不是所有博客都值得读！过滤掉 marketing、product announcements、off-topic 内容。
+2. **Be Ruthless**: 宁缺毋滥。如果今天没有好内容，各 section 可以是空的。
+3. **Be Specific**: 不要说 "interesting"，要说具体 interesting 在哪里。
+4. **深度分析要有干货**: Key Insights 要有具体内容，不要泛泛而谈。
 5. **中英文夹杂**: 专有名词（如 diffusion, CoT, RLHF, scaling law）保留英文。
-6. **INTEGRATE COMMUNITY SIGNALS**: 这是最重要的升级！你必须在分析中自然融入社区信号：
-   - "虽然方法简单，但Reddit上引发了关于X的大讨论"
-   - "GitHub已获1k stars，说明implementation质量高"
-   - "社区反馈指出reproducibility issues，需谨慎对待"
+6. **Action-oriented**: 每篇深度分析都要给出"读完后该做什么"的建议。"""
 
-现在开始你的审阅。记住：你的读者是忙碌的researchers，他们相信你的判断。
-"""
-        
-        return system_prompt + "\n\n---\n\n" + user_prompt
-
+        return {"system": system_prompt, "user": user_prompt}
+    
     async def generate_report(
         self, 
-        papers: list[Paper],
+        papers: list[Paper], 
         use_pdf_multimodal: bool = True,
+        blog_posts: list[Paper] = None,
     ) -> str:
-        """Generate a full HTML report for the papers."""
+        """
+        Generate the daily paper digest report.
         
-        use_pdf = use_pdf_multimodal and self.client.supports_pdf_native()
+        Args:
+            papers: List of filtered papers to analyze
+            use_pdf_multimodal: Whether to use PDF multimodal input
+            blog_posts: List of priority blog posts (will be filtered by LLM)
         
-        if use_pdf:
-            html_content = await self._generate_report_with_pdfs(papers)
-        else:
-            html_content = await self._generate_report_with_text(papers)
+        Returns:
+            HTML report string
+        """
+        if not papers and not blog_posts:
+            return self._wrap_html("<p>No papers or blog posts to review today.</p>", [], blog_posts)
         
-        return self._wrap_in_template(html_content, papers)
-    
-    async def _generate_report_with_pdfs(self, papers: list[Paper]) -> str:
-        """Generate report using PDF multimodal input."""
-        papers_with_pdf = [p for p in papers if p.pdf_url]
+        # Separate blog posts from papers if they're mixed together
+        actual_papers = []
+        actual_blogs = list(blog_posts) if blog_posts else []
         
-        if not papers_with_pdf:
-            print("   No PDFs available, using text mode")
-            return await self._generate_report_with_text(papers)
-        
-        try:
-            if self.client.is_anthropic and len(papers_with_pdf) <= 10:
-                print(f"   📄 Sending {len(papers_with_pdf)} PDFs to Claude...")
-                pdf_urls = [p.pdf_url for p in papers_with_pdf]
-                html_content, failed_indices = await self.client.achat_with_multiple_pdfs(
-                    self._build_prompt(papers, papers_with_pdf), 
-                    pdf_urls, 
-                    max_tokens=8000
-                )
-                
-                if failed_indices:
-                    failed_papers = [papers_with_pdf[i] for i in failed_indices]
-                    print(f"   ⚠️ {len(failed_indices)} PDFs failed")
-                    failed_note = self._build_failed_note(failed_papers)
-                    html_content = failed_note + html_content
+        for paper in papers:
+            if getattr(paper, 'is_blog', False):
+                actual_blogs.append(paper)
             else:
-                print(f"   📄 Processing {len(papers_with_pdf)} PDFs individually...")
-                summaries = await self._process_pdfs_individually(papers_with_pdf)
-                
-                prompt = self._build_prompt(papers, papers_with_pdf)
-                final_prompt = f"""{prompt}
-
----
-## Pre-Analysis (Individual PDF Summaries)
-{chr(10).join(summaries)}
-
-请基于以上预分析生成完整报告。"""
-                
-                html_content = await self.client.achat(
-                    [{"role": "user", "content": final_prompt}],
-                    max_tokens=8000
-                )
+                actual_papers.append(paper)
+        
+        # Remove duplicates from blogs
+        seen_urls = set()
+        unique_blogs = []
+        for blog in actual_blogs:
+            if blog.url not in seen_urls:
+                seen_urls.add(blog.url)
+                unique_blogs.append(blog)
+        actual_blogs = unique_blogs
+        
+        papers_with_pdf = []
+        failed_pdf_papers = []
+        
+        # Process PDFs for papers only (not blogs)
+        if use_pdf_multimodal and actual_papers:
+            print(f"   📄 Processing {len(actual_papers)} PDFs individually...")
+            
+            for i, paper in enumerate(actual_papers, 1):
+                print(f"      [{i}/{len(actual_papers)}] {paper.title[:40]}...")
+                pdf_content, success = await self.client.fetch_pdf_as_base64(paper.pdf_url)
+                if success:
+                    paper._pdf_base64 = pdf_content
+                    papers_with_pdf.append(paper)
+                else:
+                    failed_pdf_papers.append(paper)
+                    paper._pdf_base64 = None
+        
+        # Build prompt
+        prompts = self._build_prompt(
+            actual_papers, 
+            papers_with_pdf, 
+            failed_pdf_papers,
+            blog_posts=actual_blogs
+        )
+        
+        # Prepare messages for LLM
+        messages = [
+            {"role": "system", "content": prompts["system"]},
+        ]
+        
+        # Build user content with PDFs
+        user_content = []
+        
+        # Add PDFs first (for papers with PDF)
+        for paper in papers_with_pdf:
+            if paper not in failed_pdf_papers and hasattr(paper, '_pdf_base64') and paper._pdf_base64:
+                user_content.append({
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": paper._pdf_base64
+                    },
+                    "cache_control": {"type": "ephemeral"}
+                })
+        
+        # Add text prompt
+        user_content.append({
+            "type": "text",
+            "text": prompts["user"]
+        })
+        
+        messages.append({"role": "user", "content": user_content})
+        
+        # Generate report
+        try:
+            content = await self.client.achat(messages, max_tokens=8000)
+            
+            # Combine papers and blogs for the wrap
+            all_items = actual_papers + actual_blogs
+            return self._wrap_html(content, all_items, actual_blogs)
+            
         except Exception as e:
-            print(f"   ⚠️ PDF processing failed: {e}, falling back to text mode")
-            return await self._generate_report_with_text(papers)
-        
-        return html_content
+            error_msg = f"<p class='error'>Error generating report: {str(e)}</p>"
+            return self._wrap_html(error_msg, actual_papers, actual_blogs)
     
-    async def _process_pdfs_individually(self, papers: list[Paper]) -> list[str]:
-        """逐个处理 PDF，使用 Senior Researcher 视角"""
-        summaries = []
+    def _wrap_html(self, content: str, papers: list[Paper], blog_posts: list[Paper] = None) -> str:
+        """Wrap content in HTML template with styling."""
+        today = datetime.now()
+        today_cn = today.strftime("%Y年%m月%d日")
+        weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        weekday = weekdays[today.weekday()]
         
-        individual_prompt = """You are a Senior Principal Researcher doing a quick paper scan.
-Extract the following in 中英文夹杂 style:
-
-1. **Authors & Affiliations**: All authors (comma-separated), main institutions
-2. **The Claim**: What's the main claim/contribution? (1-2 sentences, be skeptical)
-3. **The Method**: Core technical approach (2-3 sentences, specific details)
-4. **The Evidence**: Key results with numbers. Any red flags? (2 sentences)
-5. **Surprise Score**: 0-10, how much does this challenge conventional wisdom?
-6. **One-liner Verdict**: Would you recommend this to your team? Why/why not?
-
-Research context: """
+        # Count items
+        paper_count = len([p for p in papers if not getattr(p, 'is_blog', False)])
+        blog_count = len(blog_posts) if blog_posts else 0
         
-        for i, paper in enumerate(papers, 1):
-            print(f"      [{i}/{len(papers)}] {paper.title[:40]}...")
-            try:
-                summary = await self.client.achat_with_pdf(
-                    individual_prompt + self.research_interests[:300],
-                    pdf_url=paper.pdf_url,
-                    max_tokens=800
-                )
-                summaries.append(f"### {paper.title}\n{paper.url}\n{summary}")
-            except Exception as e:
-                print(f"         ⚠️ Failed: {e}")
-                summaries.append(f"### {paper.title}\n{paper.url}\n[PDF失败] Abstract: {paper.abstract[:400]}...")
-        
-        return summaries
-    
-    async def _generate_report_with_text(self, papers: list[Paper]) -> str:
-        """Generate report using text-only input (abstracts only)."""
-        
-        papers_info = []
-        for i, paper in enumerate(papers, 1):
-            authors_str = ", ".join([a.name for a in paper.authors[:5]])
-            if len(paper.authors) > 5:
-                authors_str += " et al."
-            
-            # Check for research_notes
-            community_signal = ""
-            if hasattr(paper, 'research_notes') and paper.research_notes:
-                community_signal = f"\n🔍 Community Signals: {paper.research_notes}"
-            
-            papers_info.append(f"""### {i}. {paper.title}
-Authors: {authors_str} | URL: {paper.url}
-Abstract: {paper.abstract}{community_signal}
-""")
-        
-        prompt = f"""You are a Senior Principal Researcher at a top-tier AI lab, screening papers for your team.
-You DESPISE incremental work. You hunt for Paradigm Shifts and Counter-intuitive Findings.
-中英文夹杂撰写（专有名词英文）。
-
-**IMPORTANT**: Some papers have 🔍 Community Signals. You MUST integrate them into your analysis.
-
-## My Research Interests
-{self.research_interests}
-
-## Today's Papers ({len(papers)} papers, abstract only)
-{chr(10).join(papers_info)}
-
----
-
-## Output (Clean HTML, no html/head/body tags)
-
-### 🏆 Editor's Choice (Top 1-3)
-只选真正值得读的。每篇：Title (链接) + Verdict (一句话，必须提及community signal如果有) + Signal (社区热度或 N/A)
-
-### 🌀 Quick Triage
-其余论文快速分类：[Worth Skimming] 或 [Pass]，每篇 1 句话理由（提及community signal如果relevant）。
-
-Note: 由于只有 abstract，不提供 Deep Dive。建议对 Editor's Choice 的论文下载 PDF 详读。
-
----
-
-HTML 结构：
-```html
-<div class="editors-choice">
-<h2>🏆 Editor's Choice</h2>
-<div class="choice-item">
-<h3><a href="URL">Title</a></h3>
-<p class="verdict"><b>Verdict:</b> ... (integrate community signal)</p>
-<p class="signal"><b>Signal:</b> ...</p>
-</div>
-</div>
-
-<div class="signals-noise">
-<h2>🌀 Quick Triage</h2>
-<div class="skim-list"><h4>📖 Worth Skimming</h4><ul><li>...</li></ul></div>
-<div class="pass-list"><h4>🚫 Pass</h4><ul><li>...</li></ul></div>
-</div>
-```
-
-Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your analysis.
-"""
-        
-        messages = [{"role": "user", "content": prompt}]
-        return await self.client.achat(messages, max_tokens=6000)
-    
-    def _build_failed_note(self, failed_papers: list[Paper]) -> str:
-        """构建 PDF 下载失败的提示"""
-        titles = ", ".join([f'<a href="{p.url}">{p.title[:30]}...</a>' for p in failed_papers[:3]])
-        if len(failed_papers) > 3:
-            titles += f" 等 {len(failed_papers)} 篇"
-        return f'<div class="warning">⚠️ PDF 下载失败（已用摘要替代）: {titles}</div>'
-    
-    def _wrap_in_template(self, content: str, papers: list[Paper]) -> str:
-        """Wrap content in a refined HTML template with MathJax support."""
-        today = datetime.now().strftime("%Y-%m-%d")
-        today_cn = datetime.now().strftime("%m月%d日")
-        weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][datetime.now().weekday()]
+        # Build meta string
+        if blog_count > 0 and paper_count > 0:
+            meta_str = f"{paper_count} papers + {blog_count} blogs reviewed"
+        elif blog_count > 0:
+            meta_str = f"{blog_count} blogs reviewed"
+        else:
+            meta_str = f"{paper_count} papers reviewed"
         
         return f"""<!DOCTYPE html>
-    <html lang="zh-CN">
+    <html>
     <head>
-        <meta charset="utf-8">
+        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Paper Digest {today}</title>
-        
-        <!-- MathJax for LaTeX rendering -->
-        <script>
-            MathJax = {{
-                tex: {{
-                    inlineMath: [['$', '$'], ['\\(', '\\)']],
-                    displayMath: [['$$', '$$'], ['\\[', '\\]']],
-                    processEscapes: true
-                }},
-                options: {{
-                    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
-                }}
-            }};
-        </script>
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
-        
+        <title>Paper Digest - {today.strftime("%Y-%m-%d")}</title>
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <style>
             * {{ box-sizing: border-box; margin: 0; padding: 0; }}
             
             body {{
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                background: #f0f2f5;
+                padding: 10px;
                 font-size: 15px;
-                line-height: 1.65;
-                color: #1a1a1a;
-                background: #f0f0f0;
-                padding: 12px;
             }}
             
             .container {{
@@ -531,6 +573,69 @@ Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your anal
             
             /* Math styling */
             .MathJax {{ font-size: 1.1em !important; }}
+            
+            /* Blog Highlights Section (NEW - Deep Dive style) */
+            .blog-highlights {{
+                background: linear-gradient(135deg, #e8f4fd, #d6eaf8);
+                border: 1px solid #85c1e9;
+                border-radius: 8px;
+                padding: 16px 20px;
+                margin-bottom: 20px;
+            }}
+            
+            .blog-highlights h2 {{
+                color: #2874a6;
+                margin: 0 0 8px 0;
+                padding: 0;
+                border: none;
+            }}
+            
+            .blog-highlights .section-desc {{
+                font-size: 0.85em;
+                color: #5d6d7e;
+                margin-bottom: 14px;
+                font-style: italic;
+            }}
+            
+            .blog-highlights .no-highlights {{
+                font-size: 0.9em;
+                color: #7f8c8d;
+                font-style: italic;
+            }}
+
+            .blog-summary {{
+                background: #fff;
+                border-radius: 6px;
+                padding: 12px 16px;
+                margin-bottom: 10px;
+                border-left: 3px solid #3498db;
+            }}
+
+            .blog-summary:last-child {{ margin-bottom: 0; }}
+
+            .blog-summary h3 {{
+                font-size: 0.95em;
+                font-weight: 600;
+                margin-bottom: 6px;
+            }}
+
+            .blog-summary h3 a {{
+                color: #1a1a1a;
+                text-decoration: none;
+            }}
+            .blog-summary h3 a:hover {{ color: #2874a6; }}
+
+            .blog-summary .source {{
+                font-size: 0.8em;
+                color: #7f8c8d;
+                margin-bottom: 8px;
+            }}
+
+            .blog-summary .summary {{
+                font-size: 0.9em;
+                color: #444;
+                line-height: 1.4;
+            }}
             
             /* Editor's Choice Section */
             .editors-choice {{
@@ -609,16 +714,48 @@ Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your anal
             .badge.high {{ background: #ffe0e0; color: #c0392b; }}
             .badge.medium {{ background: #fff3cd; color: #b7791f; }}
             .badge.low {{ background: #e8e8e8; color: #666; }}
+            .badge.blog {{ background: #e8f4fd; color: #2874a6; }}
             
             .paper-body {{ font-size: 0.9em; color: #444; }}
             .paper-body p {{ margin-bottom: 10px; }}
             .paper-body b {{ color: #1a1a2e; }}
-            .paper-body .authors {{ 
-                color: #666; 
-                font-size: 0.85em; 
+            .paper-body .authors {{
+                color: #666;
+                font-size: 0.85em;
                 margin-bottom: 12px;
                 padding-bottom: 10px;
                 border-bottom: 1px dashed #ddd;
+            }}
+
+            /* Blog Deep Dive in Deep Dive section */
+            .blog {{
+                padding: 16px 18px;
+                margin-bottom: 14px;
+                background: #f0f8ff;
+                border-radius: 8px;
+                border-left: 4px solid #3498db;
+            }}
+
+            .blog-title {{
+                font-size: 1em;
+                font-weight: 600;
+                margin-bottom: 12px;
+                line-height: 1.4;
+            }}
+
+            .blog-title a {{ color: #1a1a1a; text-decoration: none; }}
+            .blog-title a:hover {{ color: #2874a6; }}
+
+            .blog-body {{ font-size: 0.9em; color: #444; }}
+            .blog-body p {{ margin-bottom: 10px; }}
+            .blog-body b {{ color: #2874a6; }}
+            .blog-body .insights ul {{
+                margin: 8px 0 12px 20px;
+                padding: 0;
+            }}
+            .blog-body .insights li {{
+                margin-bottom: 6px;
+                color: #444;
             }}
             
             /* Signals & Noise Section */
@@ -637,26 +774,24 @@ Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your anal
                 border: none;
             }}
             
-            .skim-list, .pass-list {{
+            .skim-list {{
                 margin-bottom: 12px;
             }}
-            
+
             .skim-list h4 {{ color: #28a745; }}
-            .pass-list h4 {{ color: #6c757d; }}
-            
-            .skim-list ul, .pass-list ul {{
+
+            .skim-list ul {{
                 padding-left: 20px;
                 margin: 0;
             }}
-            
-            .skim-list li, .pass-list li {{
+
+            .skim-list li {{
                 font-size: 0.88em;
                 color: #555;
                 padding: 3px 0;
             }}
-            
+
             .skim-list a {{ color: #28a745; }}
-            .pass-list a {{ color: #6c757d; }}
             
             /* Warning */
             .warning {{
@@ -670,6 +805,17 @@ Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your anal
             }}
             
             .warning a {{ color: #856404; }}
+            
+            /* Error */
+            .error {{
+                background: #f8d7da;
+                border: 1px solid #f5c6cb;
+                border-radius: 6px;
+                padding: 10px 14px;
+                margin-bottom: 14px;
+                font-size: 0.85em;
+                color: #721c24;
+            }}
             
             .footer {{
                 text-align: center;
@@ -686,8 +832,8 @@ Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your anal
                 .content {{ padding: 14px 16px; }}
                 .header {{ padding: 14px 16px; }}
                 .paper {{ padding: 12px 14px; }}
-                .editors-choice, .signals-noise {{ padding: 12px 14px; }}
-                .choice-item {{ padding: 10px 12px; }}
+                .editors-choice, .signals-noise, .blog-highlights {{ padding: 12px 14px; }}
+                .choice-item, .blog-summary {{ padding: 10px 12px; }}
             }}
         </style>
     </head>
@@ -695,7 +841,7 @@ Be ruthless. 宁缺毋滥。INTEGRATE COMMUNITY SIGNALS naturally into your anal
         <div class="container">
             <div class="header">
                 <h1>📚 Paper Digest</h1>
-                <div class="meta">{today_cn} {weekday} · {len(papers)} papers reviewed</div>
+                <div class="meta">{today_cn} {weekday} · {meta_str}</div>
                 <div class="persona">Curated by PaperFeeder · No fluff, no hype</div>
             </div>
             

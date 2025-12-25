@@ -9,20 +9,12 @@ import asyncio
 import aiohttp
 import json
 import xml.etree.ElementTree as ET
-from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Optional, List
 import re
 
 from models import Paper, Author, PaperSource
-
-
-class BaseSource(ABC):
-    """Abstract base class for paper sources."""
-    
-    @abstractmethod
-    async def fetch(self, **kwargs) -> List[Paper]:
-        pass
+from .base import BaseSource
 
 
 class ArxivSource(BaseSource):
