@@ -298,23 +298,31 @@ def inject_feedback_actions_into_report(report_html: str, manifest_path: str) ->
 .pf-feedback-btn.negative{border-color:#c85f5f;background:#fff1f1;color:#8f1f1f}
 .pf-feedback-btn.is-loading{opacity:.6;pointer-events:none}
 .pf-feedback-btn.is-selected{box-shadow:0 0 0 2px rgba(40,120,220,.22) inset}
-.pf-feedback-toast{position:fixed;right:14px;bottom:14px;background:#1f2937;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;z-index:9999;opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease}
-.pf-feedback-toast.show{opacity:1;transform:translateY(0)}
+.pf-feedback-toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.94);min-width:240px;max-width:86vw;padding:14px 18px;border-radius:14px;font-size:15px;font-weight:700;text-align:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .22s ease,transform .22s ease;box-shadow:0 12px 40px rgba(8,16,40,.34)}
+.pf-feedback-toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.pf-feedback-toast.ok{color:#fff;background:linear-gradient(135deg,#2f855a,#38a169)}
+.pf-feedback-toast.bad{color:#fff;background:linear-gradient(135deg,#b83280,#d53f8c)}
+.pf-feedback-toast.err{color:#fff;background:linear-gradient(135deg,#2d3748,#4a5568)}
+.pf-feedback-toast .icon{margin-right:8px}
+@keyframes pfPulse{0%{transform:translate(-50%,-50%) scale(.92)}55%{transform:translate(-50%,-50%) scale(1.04)}100%{transform:translate(-50%,-50%) scale(1)}}
+.pf-feedback-toast.show{animation:pfPulse .34s ease}
 </style>
 """
     script = """
 <script>
 (function(){
-  function showToast(msg){
+  function showToast(msg, tone){
     var t = document.querySelector('.pf-feedback-toast');
     if(!t){
       t = document.createElement('div');
       t.className = 'pf-feedback-toast';
       document.body.appendChild(t);
     }
-    t.textContent = msg;
+    t.classList.remove('ok','bad','err');
+    t.classList.add(tone || 'ok');
+    t.innerHTML = msg;
     t.classList.add('show');
-    setTimeout(function(){ t.classList.remove('show'); }, 1200);
+    setTimeout(function(){ t.classList.remove('show'); }, 1350);
   }
   document.addEventListener('click', async function(ev){
     var a = ev.target && ev.target.closest ? ev.target.closest('a.pf-feedback-btn') : null;
@@ -325,7 +333,7 @@ def inject_feedback_actions_into_report(report_html: str, manifest_path: str) ->
     try{
       var resp = await fetch(a.href, { method: 'GET', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' }});
       if(!resp.ok){
-        showToast('Feedback failed');
+        showToast('<span class="icon">⚠️</span>Feedback failed', 'bad');
         return;
       }
       var wrap = a.closest('.pf-feedback-actions');
@@ -333,9 +341,13 @@ def inject_feedback_actions_into_report(report_html: str, manifest_path: str) ->
         wrap.querySelectorAll('.pf-feedback-btn').forEach(function(btn){ btn.classList.remove('is-selected'); });
       }
       a.classList.add('is-selected');
-      showToast('Feedback saved');
+      if(a.classList.contains('positive')){
+        showToast('<span class="icon">✅</span>Saved as Positive', 'ok');
+      }else{
+        showToast('<span class="icon">🧪</span>Saved as Negative', 'bad');
+      }
     }catch(_err){
-      showToast('Network error');
+      showToast('<span class="icon">📡</span>Network error', 'err');
     }finally{
       a.classList.remove('is-loading');
     }
