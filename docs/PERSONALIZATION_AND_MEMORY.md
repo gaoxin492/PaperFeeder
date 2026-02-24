@@ -15,7 +15,12 @@ This guide explains how to run PaperFeeder with:
 
 - `semantic_scholar_memory.json`
   - Short-term anti-repetition memory
-  - Stores recently seen Semantic Scholar paper IDs with timestamps
+  - Stores unified cross-source seen keys with timestamps
+  - Key namespaces:
+    - `arxiv:<id>` (canonical when arXiv id exists)
+    - `semantic:<CorpusId...>` (semantic compatibility)
+    - legacy raw semantic ids (for migration compatibility)
+    - `hf:<normalized-url>` (HF fallback without arXiv id)
 
 - `artifacts/run_feedback_manifest_<run_id>.json`
   - Mapping between final report items and semantic paper IDs for that run
@@ -26,7 +31,7 @@ This guide explains how to run PaperFeeder with:
 ## 2. How the recommendation loop works
 
 1. Fetch Semantic Scholar candidates from your seed profile.
-2. Suppress recently seen IDs (memory TTL window).
+2. Suppress recently seen keys (memory TTL window) across Semantic Scholar/arXiv/HF.
 3. Run filtering + synthesis and generate digest.
 4. If you click feedback in web viewer, events are queued to D1 (`pending`).
 5. Manual apply action updates `semantic_scholar_seeds.json`.
@@ -102,6 +107,11 @@ Default:
 Current default dedup rules:
 - Papers: `arxiv_id` first, else `url`
 - Blogs: exact `url`
+
+Memory suppression rules (separate from fetch dedup):
+- canonical preference is `arxiv:<id>` when available
+- Semantic Scholar keeps dual-read/dual-write compatibility (`semantic:*` + legacy raw id)
+- only report-visible final papers are written into memory
 
 Title-based dedup is not the default pipeline key right now.
 

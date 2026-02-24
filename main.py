@@ -26,7 +26,7 @@ from summarizer import PaperSummarizer
 from emailer import ResendEmailer, FileEmailer
 from config import Config
 from models import Paper, PaperSource
-from semantic_memory import SemanticMemoryStore
+from semantic_memory import SemanticMemoryStore, memory_keys_for_paper
 from semantic_feedback import (
     build_feedback_run_view_url,
     export_run_feedback_manifest,
@@ -48,11 +48,47 @@ except ImportError:
 async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
     """Stage 1: Fetch papers from all sources (Recall)."""
     papers = []
+    memory_store = None
+
+    setattr(config, "_semantic_memory_store", None)
+    if getattr(config, "semantic_memory_enabled", True):
+        memory_store = SemanticMemoryStore(
+            path=getattr(config, "semantic_memory_path", "semantic_scholar_memory.json"),
+            max_ids=getattr(config, "semantic_memory_max_ids", 5000),
+        )
+        memory_store.load()
+        pruned = memory_store.prune_expired(getattr(config, "semantic_seen_ttl_days", 30))
+        if pruned:
+            print(f"      🧹 Semantic memory pruned expired seen IDs: {pruned}")
+        setattr(config, "_semantic_memory_store", memory_store)
+
+    def suppress_by_memory(candidates: List[Paper], source_label: str) -> List[Paper]:
+        if not memory_store:
+            return candidates
+        try:
+            ttl_days = getattr(config, "semantic_seen_ttl_days", 30)
+            filtered: List[Paper] = []
+            for paper in candidates:
+                keys = memory_keys_for_paper(paper)
+                if keys and memory_store.recently_seen_any(keys, ttl_days=ttl_days):
+                    continue
+                filtered.append(paper)
+            suppressed = len(candidates) - len(filtered)
+            if suppressed:
+                print(
+                    f"      📉 {source_label} suppression: "
+                    f"total={len(candidates)}, suppressed={suppressed}, forwarded={len(filtered)}"
+                )
+            return filtered
+        except Exception as e:
+            print(f"      ⚠️ {source_label} suppression failed, proceeding without suppression: {e}")
+            return candidates
     
     # arXiv
     print("📚 Fetching from arXiv...")
     arxiv_source = ArxivSource(config.arxiv_categories)
     arxiv_papers = await arxiv_source.fetch(days_back=days_back, max_results=300)
+    arxiv_papers = suppress_by_memory(arxiv_papers, "arXiv")
     papers.extend(arxiv_papers)
     print(f"   Found {len(arxiv_papers)} papers")
     
@@ -60,6 +96,7 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
     print("🤗 Fetching from HuggingFace Daily Papers...")
     hf_source = HuggingFaceSource()
     hf_papers = await hf_source.fetch()
+    hf_papers = suppress_by_memory(hf_papers, "HuggingFace")
     papers.extend(hf_papers)
     print(f"   Found {len(hf_papers)} papers")
     
@@ -72,19 +109,8 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
         print(f"   Found {len(manual_papers)} papers")
 
     # Semantic Scholar recommendations (seed-based)
-    setattr(config, "_semantic_memory_store", None)
     if getattr(config, "semantic_scholar_enabled", False):
         print("🧠 Fetching from Semantic Scholar recommendations...")
-        memory_store = None
-        if getattr(config, "semantic_memory_enabled", True):
-            memory_store = SemanticMemoryStore(
-                path=getattr(config, "semantic_memory_path", "semantic_scholar_memory.json"),
-                max_ids=getattr(config, "semantic_memory_max_ids", 5000),
-            )
-            memory_store.load()
-            pruned = memory_store.prune_expired(getattr(config, "semantic_seen_ttl_days", 30))
-            if pruned:
-                print(f"      🧹 Semantic memory pruned expired seen IDs: {pruned}")
         s2_source = SemanticScholarSource(
             api_key=getattr(config, "semantic_scholar_api_key", ""),
             seeds_path=getattr(config, "semantic_scholar_seeds_path", "semantic_scholar_seeds.json"),
@@ -103,7 +129,6 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
                 f"suppressed={stats.get('suppressed', 0)}, "
                 f"forwarded={stats.get('forwarded', 0)}"
             )
-        setattr(config, "_semantic_memory_store", memory_store)
     
     # Deduplicate by arxiv_id or url
     seen = set()
@@ -145,7 +170,7 @@ def _extract_report_urls(report_html: str) -> set[str]:
 
 
 def update_semantic_memory_from_report(final_papers: List[Paper], report_html: str, config: Config) -> None:
-    """Mark only report-visible Semantic Scholar papers as seen and persist memory."""
+    """Mark only report-visible final papers as seen and persist cross-source memory."""
     if not getattr(config, "semantic_memory_enabled", True):
         return
 
@@ -154,38 +179,46 @@ def update_semantic_memory_from_report(final_papers: List[Paper], report_html: s
         return
 
     report_urls = _extract_report_urls(report_html)
-    s2_final = [
+    final_memory_candidates = [
         p
         for p in final_papers
-        if getattr(p, "source", None) == PaperSource.SEMANTIC_SCHOLAR
-        and getattr(p, "semantic_paper_id", None)
+        if getattr(p, "source", None) in {
+            PaperSource.SEMANTIC_SCHOLAR,
+            PaperSource.ARXIV,
+            PaperSource.HUGGINGFACE,
+        }
     ]
-    if not s2_final:
-        print("   ⭕ Semantic memory: no final Semantic Scholar papers")
+    if not final_memory_candidates:
+        print("   ⭕ Semantic memory: no final papers eligible for memory")
         return
 
-    visible_ids = sorted(
-        {
-            p.semantic_paper_id
-            for p in s2_final
-            if _normalize_url_for_match(getattr(p, "url", "")) in report_urls
-        }
-    )
-    if not visible_ids:
+    visible_papers = [
+        p for p in final_memory_candidates
+        if _normalize_url_for_match(getattr(p, "url", "")) in report_urls
+    ]
+    if not visible_papers:
         print(
-            "   ⭕ Semantic memory: no report-visible Semantic Scholar papers to update "
-            f"(final_selected={len(s2_final)})"
+            "   ⭕ Semantic memory: no report-visible final papers to update "
+            f"(final_selected={len(final_memory_candidates)})"
+        )
+        return
+
+    visible_keys = sorted({k for paper in visible_papers for k in memory_keys_for_paper(paper)})
+    if not visible_keys:
+        print(
+            "   ⭕ Semantic memory: report-visible papers had no usable memory keys "
+            f"(report_visible={len(visible_papers)})"
         )
         return
 
     try:
-        memory_store.mark_seen(visible_ids)
+        memory_store.mark_seen(visible_keys)
         removed = memory_store.prune_expired(getattr(config, "semantic_seen_ttl_days", 30))
         memory_store.save()
         print(
             "   ✅ Semantic memory updated: "
-            f"final_selected={len(s2_final)}, report_visible={len(visible_ids)}, "
-            f"seen_added={len(visible_ids)}, expired_removed={removed}"
+            f"final_selected={len(final_memory_candidates)}, report_visible={len(visible_papers)}, "
+            f"seen_keys_added={len(visible_keys)}, expired_removed={removed}"
         )
     except Exception as e:
         print(f"   ⚠️ Semantic memory update failed (non-blocking): {e}")
@@ -600,7 +633,7 @@ async def run_pipeline(config_path: str = "config.yaml", days_back: int = 1, dry
     except Exception as e:
         print(f"   ⚠️ Feedback manifest export failed (non-blocking): {e}")
 
-    # Persist seen-memory only for report-visible Semantic Scholar papers (non-blocking).
+    # Persist seen-memory only for report-visible final papers (non-blocking).
     update_semantic_memory_from_report(final_papers, report, config)
     
     # Output/Send

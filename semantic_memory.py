@@ -1,4 +1,4 @@
-"""Persistent memory for Semantic Scholar recommendation suppression."""
+"""Persistent memory for cross-source recommendation suppression."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Iterable, Set
+from typing import Any, Dict, Iterable, Set
+from urllib.parse import urlsplit, urlunsplit
 
 
 def _utcnow() -> datetime:
@@ -27,6 +28,68 @@ def _parse_iso(s: str) -> datetime | None:
         return dt.astimezone(timezone.utc)
     except Exception:
         return None
+
+
+def normalize_semantic_id(value: Any) -> str:
+    if value is None:
+        return ""
+    s = str(value).strip()
+    if not s:
+        return ""
+    if s.isdigit():
+        return f"CorpusId:{s}"
+    return s
+
+
+def normalize_arxiv_id(value: Any) -> str:
+    if value is None:
+        return ""
+    s = str(value).strip()
+    if not s:
+        return ""
+    # Normalize common arXiv forms to bare id (e.g., arXiv:2501.00001 -> 2501.00001)
+    low = s.lower()
+    if low.startswith("arxiv:"):
+        s = s.split(":", 1)[1].strip()
+    return s.lower()
+
+
+def normalize_url(url: str) -> str:
+    if not url:
+        return ""
+    try:
+        parts = urlsplit(url.strip())
+        scheme = parts.scheme.lower() if parts.scheme else "https"
+        netloc = parts.netloc.lower()
+        path = parts.path.rstrip("/")
+        return urlunsplit((scheme, netloc, path, "", ""))
+    except Exception:
+        return url.strip().lower().rstrip("/")
+
+
+def memory_keys_for_paper(paper: Any) -> Set[str]:
+    """
+    Generate source-aware memory keys for a paper.
+    Backward compatibility:
+    - semantic papers include legacy raw semantic id key.
+    """
+    out: Set[str] = set()
+    semantic_id = normalize_semantic_id(getattr(paper, "semantic_paper_id", ""))
+    arxiv_id = normalize_arxiv_id(getattr(paper, "arxiv_id", ""))
+    source = str(getattr(getattr(paper, "source", None), "value", "")).strip().lower()
+    url = normalize_url(getattr(paper, "url", ""))
+
+    # Canonical key preference: use arXiv key when available.
+    if arxiv_id:
+        out.add(f"arxiv:{arxiv_id}")
+    if semantic_id:
+        out.add(f"semantic:{semantic_id}")
+        out.add(semantic_id)  # legacy compatibility (dual-write/dual-read)
+    if source == "huggingface" and not arxiv_id and url:
+        out.add(f"hf:{url}")
+    if source == "arxiv" and not arxiv_id and url:
+        out.add(f"arxiv:{url}")
+    return {k for k in out if k}
 
 
 @dataclass
@@ -105,6 +168,13 @@ class SemanticMemoryStore:
     def filter_recently_seen(self, paper_ids: Iterable[str], ttl_days: int) -> Set[str]:
         now = _utcnow()
         return {pid for pid in paper_ids if self.recently_seen(pid, ttl_days, now=now)}
+
+    def recently_seen_any(self, paper_ids: Iterable[str], ttl_days: int, now: datetime | None = None) -> bool:
+        now_v = now or _utcnow()
+        for pid in paper_ids:
+            if self.recently_seen(str(pid), ttl_days, now=now_v):
+                return True
+        return False
 
     def prune_expired(self, ttl_days: int) -> int:
         cutoff = _utcnow() - timedelta(days=ttl_days)

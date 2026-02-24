@@ -15,7 +15,7 @@ import re
 
 from models import Paper, Author, PaperSource
 from .base import BaseSource
-from semantic_memory import SemanticMemoryStore
+from semantic_memory import SemanticMemoryStore, memory_keys_for_paper
 
 
 class ArxivSource(BaseSource):
@@ -532,12 +532,12 @@ class SemanticScholarSource(BaseSource):
             return papers
 
         try:
-            ids = [p.semantic_paper_id for p in papers if getattr(p, "semantic_paper_id", None)]
-            suppressed_ids = self.memory_store.filter_recently_seen(ids, ttl_days=self.seen_ttl_days)
-            filtered = [
-                p for p in papers
-                if not getattr(p, "semantic_paper_id", None) or p.semantic_paper_id not in suppressed_ids
-            ]
+            filtered: List[Paper] = []
+            for paper in papers:
+                keys = memory_keys_for_paper(paper)
+                if keys and self.memory_store.recently_seen_any(keys, ttl_days=self.seen_ttl_days):
+                    continue
+                filtered.append(paper)
             suppressed = total - len(filtered)
             self.last_stats = {
                 "total": total,

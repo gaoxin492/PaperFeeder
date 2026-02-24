@@ -8,11 +8,49 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 from models import Paper, PaperSource
-from main import _extract_report_urls, _normalize_url_for_match
-from semantic_memory import SemanticMemoryStore
+from main import _extract_report_urls, _normalize_url_for_match, update_semantic_memory_from_report
+from semantic_memory import (
+    SemanticMemoryStore,
+    memory_keys_for_paper,
+    normalize_arxiv_id,
+    normalize_semantic_id,
+)
 from sources.paper_sources import SemanticScholarSource
+
+
+class MemoryKeyHelpersTests(unittest.TestCase):
+    def test_normalization_helpers(self):
+        self.assertEqual(normalize_semantic_id("123"), "CorpusId:123")
+        self.assertEqual(normalize_semantic_id("CorpusId:123"), "CorpusId:123")
+        self.assertEqual(normalize_arxiv_id("arXiv:2501.00001"), "2501.00001")
+        self.assertEqual(normalize_arxiv_id("2501.00001V2"), "2501.00001v2")
+
+    def test_memory_key_generation_prefers_arxiv_with_semantic_dual_write(self):
+        paper = Paper(
+            title="A",
+            abstract="",
+            url="https://www.semanticscholar.org/paper/abc",
+            source=PaperSource.SEMANTIC_SCHOLAR,
+            semantic_paper_id="12345",
+            arxiv_id="arXiv:2501.00001",
+        )
+        keys = memory_keys_for_paper(paper)
+        self.assertIn("arxiv:2501.00001", keys)
+        self.assertIn("semantic:CorpusId:12345", keys)
+        self.assertIn("CorpusId:12345", keys)
+
+    def test_hf_without_arxiv_falls_back_to_hf_url(self):
+        paper = Paper(
+            title="HF",
+            abstract="",
+            url="https://huggingface.co/papers/abc?x=1",
+            source=PaperSource.HUGGINGFACE,
+        )
+        keys = memory_keys_for_paper(paper)
+        self.assertEqual(keys, {"hf:https://huggingface.co/papers/abc"})
 
 
 class SemanticMemoryStoreTests(unittest.TestCase):
@@ -106,6 +144,72 @@ class SemanticScholarSuppressionTests(unittest.TestCase):
             ]
             second = source._apply_seen_suppression(papers)
             self.assertEqual([p.semantic_paper_id for p in second], ["r3"])
+
+    def test_cross_source_suppression_uses_arxiv_key(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mem_path = Path(tmpdir) / "memory.json"
+            mem_store = SemanticMemoryStore(str(mem_path), max_ids=10)
+            mem_store.load()
+            mem_store.mark_seen(["arxiv:2501.00001"])
+
+            source = SemanticScholarSource(memory_store=mem_store, seen_ttl_days=30)
+            papers = [
+                Paper(
+                    title="A",
+                    abstract="",
+                    url="https://arxiv.org/abs/2501.00001",
+                    source=PaperSource.SEMANTIC_SCHOLAR,
+                    semantic_paper_id="s2-a",
+                    arxiv_id="2501.00001",
+                ),
+                Paper(
+                    title="B",
+                    abstract="",
+                    url="https://arxiv.org/abs/2501.00002",
+                    source=PaperSource.SEMANTIC_SCHOLAR,
+                    semantic_paper_id="s2-b",
+                    arxiv_id="2501.00002",
+                ),
+            ]
+            filtered = source._apply_seen_suppression(papers)
+            self.assertEqual([p.semantic_paper_id for p in filtered], ["s2-b"])
+
+
+class ReportMemoryUpdateTests(unittest.TestCase):
+    def test_update_memory_marks_report_visible_cross_source_keys(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mem_path = Path(tmpdir) / "memory.json"
+            store = SemanticMemoryStore(str(mem_path), max_ids=100)
+            store.load()
+            cfg = SimpleNamespace(
+                semantic_memory_enabled=True,
+                semantic_seen_ttl_days=30,
+                _semantic_memory_store=store,
+            )
+            final_papers = [
+                Paper(
+                    title="S2",
+                    abstract="",
+                    url="https://arxiv.org/abs/2501.00001",
+                    source=PaperSource.SEMANTIC_SCHOLAR,
+                    semantic_paper_id="123",
+                    arxiv_id="2501.00001",
+                ),
+                Paper(
+                    title="HF",
+                    abstract="",
+                    url="https://huggingface.co/papers/demo",
+                    source=PaperSource.HUGGINGFACE,
+                ),
+            ]
+            report_html = """
+            <a href="https://arxiv.org/abs/2501.00001">paper</a>
+            """
+            update_semantic_memory_from_report(final_papers, report_html, cfg)
+            self.assertTrue(store.recently_seen("arxiv:2501.00001", ttl_days=30))
+            self.assertTrue(store.recently_seen("semantic:CorpusId:123", ttl_days=30))
+            self.assertTrue(store.recently_seen("CorpusId:123", ttl_days=30))
+            self.assertFalse(store.recently_seen("hf:https://huggingface.co/papers/demo", ttl_days=30))
 
 
 class ReportMatchTests(unittest.TestCase):

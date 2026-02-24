@@ -535,10 +535,12 @@ Or just add URLs (metadata auto-fetched):
 #### Semantic memory behavior
 
 - Memory file: `semantic_scholar_memory.json`.
-- Only Semantic Scholar papers that are both:
-  1. selected into final candidates, and
-  2. actually present as links in rendered report HTML  
-  are marked as `seen`.
+- Memory uses unified cross-source keys:
+  - `arxiv:<id>` (canonical when available)
+  - `semantic:<id>` plus legacy raw semantic id (migration compatibility)
+  - `hf:<normalized-url>` fallback when no arXiv id exists
+- Suppression applies across Semantic Scholar, arXiv, and HuggingFace.
+- Only final papers that are actually present as links in rendered report HTML are marked as `seen`.
 - Seen suppression window is controlled by `semantic_seen_ttl_days`.
 - Memory size is capped by `semantic_memory_max_ids` (oldest entries are pruned).
 
