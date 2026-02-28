@@ -143,6 +143,12 @@ class Config:
     feedback_link_signing_secret: str = ""
     feedback_token_ttl_days: int = 7
     feedback_reviewer: str = ""
+    feedback_resolution_enabled: bool = True
+    feedback_resolution_timeout_sec: int = 8
+    feedback_resolution_max_lookups: int = 25
+    feedback_resolution_no_key_max_lookups: int = 10
+    feedback_resolution_time_budget_sec: int = 20
+    feedback_resolution_run_cache_enabled: bool = True
     
     @classmethod
     def from_yaml(cls, path: str) -> "Config":
@@ -171,6 +177,12 @@ class Config:
             "feedback_link_signing_secret": os.getenv("FEEDBACK_LINK_SIGNING_SECRET"),
             "feedback_token_ttl_days": os.getenv("FEEDBACK_TOKEN_TTL_DAYS"),
             "feedback_reviewer": os.getenv("FEEDBACK_REVIEWER"),
+            "feedback_resolution_enabled": os.getenv("FEEDBACK_RESOLUTION_ENABLED"),
+            "feedback_resolution_timeout_sec": os.getenv("FEEDBACK_RESOLUTION_TIMEOUT_SEC"),
+            "feedback_resolution_max_lookups": os.getenv("FEEDBACK_RESOLUTION_MAX_LOOKUPS"),
+            "feedback_resolution_no_key_max_lookups": os.getenv("FEEDBACK_RESOLUTION_NO_KEY_MAX_LOOKUPS"),
+            "feedback_resolution_time_budget_sec": os.getenv("FEEDBACK_RESOLUTION_TIME_BUDGET_SEC"),
+            "feedback_resolution_run_cache_enabled": os.getenv("FEEDBACK_RESOLUTION_RUN_CACHE_ENABLED"),
             # Source enablement
             "papers_enabled": os.getenv("PAPERS_ENABLED"),
             "semantic_scholar_enabled": os.getenv("SEMANTIC_SCHOLAR_ENABLED"),
@@ -190,10 +202,27 @@ class Config:
         for key, value in env_overrides.items():
             if value is not None:
                 # Handle boolean conversion for source enablement
-                if key in ("blogs_enabled", "papers_enabled", "semantic_scholar_enabled", "semantic_memory_enabled"):
+                if key in (
+                    "blogs_enabled",
+                    "papers_enabled",
+                    "semantic_scholar_enabled",
+                    "semantic_memory_enabled",
+                    "feedback_resolution_enabled",
+                    "feedback_resolution_run_cache_enabled",
+                ):
                     config_data[key] = value.lower() not in ("false", "0", "no", "off")
                 # Handle int conversion for blog_days_back
-                elif key in ("blog_days_back", "semantic_scholar_max_results", "semantic_seen_ttl_days", "semantic_memory_max_ids", "feedback_token_ttl_days"):
+                elif key in (
+                    "blog_days_back",
+                    "semantic_scholar_max_results",
+                    "semantic_seen_ttl_days",
+                    "semantic_memory_max_ids",
+                    "feedback_token_ttl_days",
+                    "feedback_resolution_timeout_sec",
+                    "feedback_resolution_max_lookups",
+                    "feedback_resolution_no_key_max_lookups",
+                    "feedback_resolution_time_budget_sec",
+                ):
                     try:
                         config_data[key] = int(value)
                     except ValueError:
@@ -253,6 +282,12 @@ class Config:
             "feedback_endpoint_base_url": self.feedback_endpoint_base_url,
             "feedback_token_ttl_days": self.feedback_token_ttl_days,
             "feedback_reviewer": self.feedback_reviewer,
+            "feedback_resolution_enabled": self.feedback_resolution_enabled,
+            "feedback_resolution_timeout_sec": self.feedback_resolution_timeout_sec,
+            "feedback_resolution_max_lookups": self.feedback_resolution_max_lookups,
+            "feedback_resolution_no_key_max_lookups": self.feedback_resolution_no_key_max_lookups,
+            "feedback_resolution_time_budget_sec": self.feedback_resolution_time_budget_sec,
+            "feedback_resolution_run_cache_enabled": self.feedback_resolution_run_cache_enabled,
         }
         
         with open(path, "w") as f:

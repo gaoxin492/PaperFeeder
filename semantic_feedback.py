@@ -12,9 +12,11 @@ import urllib.request
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import quote_plus
 from urllib.parse import urlsplit, urlunsplit
+
+from semantic_resolver import SemanticPaperResolver
 
 
 ALLOWED_LABELS = {"positive", "negative", "undecided"}
@@ -177,6 +179,13 @@ def export_run_feedback_manifest(
     feedback_link_signing_secret: str = "",
     reviewer: str = "",
     token_ttl_days: int = 7,
+    semantic_scholar_api_key: str = "",
+    resolver_enabled: bool = True,
+    resolver_timeout_sec: int = 8,
+    resolver_max_lookups: int = 25,
+    resolver_no_key_max_lookups: int = 10,
+    resolver_time_budget_sec: int = 20,
+    resolver_run_cache_enabled: bool = True,
 ) -> Tuple[Path, Path] | None:
     """Export final report paper mappings for human feedback."""
     papers = list(final_papers or [])
@@ -185,17 +194,76 @@ def export_run_feedback_manifest(
 
     visible_urls = _extract_report_urls(report_html)
     entries: List[Dict[str, Any]] = []
+    resolver = SemanticPaperResolver(
+        api_key=(semantic_scholar_api_key or "").strip(),
+        timeout_sec=int(resolver_timeout_sec),
+        max_lookups=int(resolver_max_lookups),
+        no_key_max_lookups=int(resolver_no_key_max_lookups),
+        time_budget_sec=int(resolver_time_budget_sec),
+        enable_cache=bool(resolver_run_cache_enabled),
+    )
+    resolver_warnings: List[str] = []
 
     for p in papers:
         url = getattr(p, "url", "") or ""
         norm_url = normalize_url(url)
         if visible_urls and norm_url not in visible_urls:
             continue
+        source = str(getattr(getattr(p, "source", None), "value", getattr(p, "source", "")) or "").strip()
+        existing_semantic_id = normalize_paper_id(getattr(p, "semantic_paper_id", "")) or ""
+        title = getattr(p, "title", "") or ""
+        arxiv_id = str(getattr(p, "arxiv_id", "") or "")
+        paper_year: Optional[int] = None
+        published = getattr(p, "published_date", None)
+        if hasattr(published, "year"):
+            try:
+                paper_year = int(published.year)
+            except Exception:
+                paper_year = None
+        author_names = []
+        for author in (getattr(p, "authors", []) or []):
+            name = str(getattr(author, "name", "") or "").strip()
+            if name:
+                author_names.append(name)
+
+        resolution_status = "existing" if existing_semantic_id else "unresolved"
+        resolution_method = "existing" if existing_semantic_id else "none"
+        resolution_error = ""
+        semantic_id = existing_semantic_id
+        if (
+            resolver_enabled
+            and not semantic_id
+            and source in {"arxiv", "huggingface"}
+        ):
+            resolved = resolver.resolve(
+                title=title,
+                url=url,
+                arxiv_id=arxiv_id,
+                existing_semantic_paper_id=existing_semantic_id,
+                source=source,
+                paper_year=paper_year,
+                author_names=author_names,
+            )
+            semantic_id = normalize_paper_id(resolved.semantic_paper_id) or ""
+            resolution_status = resolved.resolution_status
+            resolution_method = resolved.resolution_method
+            resolution_error = resolved.error
+            if resolution_error:
+                resolver_warnings.append(
+                    f"{title[:80]}: {resolution_method}:{resolution_error}"
+                )
+
+        feedback_enabled = bool(semantic_id)
         entries.append(
             {
-                "title": getattr(p, "title", "") or "",
+                "title": title,
                 "url": url,
-                "semantic_paper_id": normalize_paper_id(getattr(p, "semantic_paper_id", "")) or None,
+                "arxiv_id": arxiv_id or None,
+                "semantic_paper_id": semantic_id or None,
+                "resolution_status": resolution_status,
+                "resolution_method": resolution_method,
+                "feedback_enabled": feedback_enabled,
+                "resolution_error": resolution_error or None,
             }
         )
 
@@ -222,6 +290,8 @@ def export_run_feedback_manifest(
         "run_id": rid,
         "generated_at": _to_iso(_utc_now()),
         "papers": entries,
+        "resolution_stats": resolver.stats(),
+        "resolution_warnings": resolver_warnings,
     }
 
     out_dir = Path(output_dir)
@@ -242,6 +312,7 @@ def export_run_feedback_manifest(
                 "note": "",
             }
             for p in entries
+            if bool(p.get("feedback_enabled"))
         ],
     }
     questionnaire_path = out_dir / f"semantic_feedback_template_{rid}.json"

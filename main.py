@@ -597,6 +597,13 @@ async def run_pipeline(config_path: str = "config.yaml", days_back: int = 1, dry
             feedback_link_signing_secret=getattr(config, "feedback_link_signing_secret", ""),
             reviewer=getattr(config, "feedback_reviewer", "") or getattr(config, "email_to", ""),
             token_ttl_days=getattr(config, "feedback_token_ttl_days", 7),
+            semantic_scholar_api_key=getattr(config, "semantic_scholar_api_key", ""),
+            resolver_enabled=getattr(config, "feedback_resolution_enabled", True),
+            resolver_timeout_sec=getattr(config, "feedback_resolution_timeout_sec", 8),
+            resolver_max_lookups=getattr(config, "feedback_resolution_max_lookups", 25),
+            resolver_no_key_max_lookups=getattr(config, "feedback_resolution_no_key_max_lookups", 10),
+            resolver_time_budget_sec=getattr(config, "feedback_resolution_time_budget_sec", 20),
+            resolver_run_cache_enabled=getattr(config, "feedback_resolution_run_cache_enabled", True),
         )
         if feedback_artifacts:
             manifest_path, questionnaire_path = feedback_artifacts

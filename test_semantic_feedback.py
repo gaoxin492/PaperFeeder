@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -487,6 +488,235 @@ class SemanticFeedbackTests(unittest.TestCase):
             self.assertNotIn("action_links", manifest["papers"][0])
             updated = inject_feedback_actions_into_report(html, str(manifest_path))
             self.assertNotIn("pf-feedback-actions", updated)
+
+    def test_manifest_cross_source_resolution_metadata_and_questionnaire_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            papers = [
+                Paper(
+                    title="Resolve Me",
+                    abstract="a",
+                    url="https://arxiv.org/abs/2501.10001",
+                    source=PaperSource.ARXIV,
+                    arxiv_id="2501.10001",
+                    semantic_paper_id="",
+                    published_date=datetime(2025, 1, 1),
+                ),
+                Paper(
+                    title="Unresolved Paper",
+                    abstract="b",
+                    url="https://arxiv.org/abs/2501.10002",
+                    source=PaperSource.HUGGINGFACE,
+                    arxiv_id="2501.10002",
+                    semantic_paper_id="",
+                ),
+            ]
+            html = (
+                '<html><head></head><body>'
+                '<a href="https://arxiv.org/abs/2501.10001">Resolve Me</a>'
+                '<a href="https://arxiv.org/abs/2501.10002">Unresolved Paper</a>'
+                "</body></html>"
+            )
+
+            class FakeResolver:
+                def __init__(self, **_kwargs):
+                    self.calls = 0
+
+                def resolve(self, **kwargs):
+                    self.calls += 1
+                    title = kwargs.get("title", "")
+                    if title == "Resolve Me":
+                        return type(
+                            "Result",
+                            (),
+                            {
+                                "semantic_paper_id": "CorpusId:123",
+                                "resolution_status": "resolved",
+                                "resolution_method": "arxiv_id",
+                                "error": "",
+                            },
+                        )()
+                    return type(
+                        "Result",
+                        (),
+                        {
+                            "semantic_paper_id": "",
+                            "resolution_status": "unresolved",
+                            "resolution_method": "title_search",
+                            "error": "",
+                        },
+                    )()
+
+                def stats(self):
+                    return {
+                        "resolved": 1,
+                        "unresolved": 1,
+                        "errors": 0,
+                        "cache_hits": 0,
+                        "lookups_attempted": 2,
+                        "budget_skips": 0,
+                    }
+
+            with patch("semantic_feedback.SemanticPaperResolver", FakeResolver):
+                out = export_run_feedback_manifest(
+                    papers,
+                    html,
+                    output_dir=td,
+                    run_id="run-meta",
+                    feedback_endpoint_base_url="https://paperfeeder-feedback.example.workers.dev",
+                    feedback_link_signing_secret="secret123",
+                    reviewer="xuhan",
+                    token_ttl_days=7,
+                )
+
+            self.assertIsNotNone(out)
+            manifest_path, questionnaire_path = out
+            manifest = json.loads(Path(manifest_path).read_text())
+            questionnaire = json.loads(Path(questionnaire_path).read_text())
+            self.assertEqual(len(manifest["papers"]), 2)
+            first = manifest["papers"][0]
+            second = manifest["papers"][1]
+            self.assertEqual(first["resolution_status"], "resolved")
+            self.assertEqual(first["resolution_method"], "arxiv_id")
+            self.assertTrue(first["feedback_enabled"])
+            self.assertIn("action_links", first)
+            self.assertFalse(second["feedback_enabled"])
+            self.assertNotIn("action_links", second)
+            self.assertEqual(questionnaire["labels"], [{"item_id": "p01", "label": "undecided", "note": ""}])
+
+    def test_manifest_only_resolves_report_visible_papers(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            papers = [
+                Paper(
+                    title="Visible",
+                    abstract="a",
+                    url="https://arxiv.org/abs/2501.20001",
+                    source=PaperSource.ARXIV,
+                    arxiv_id="2501.20001",
+                ),
+                Paper(
+                    title="Hidden",
+                    abstract="b",
+                    url="https://arxiv.org/abs/2501.20002",
+                    source=PaperSource.ARXIV,
+                    arxiv_id="2501.20002",
+                ),
+            ]
+            html = '<a href="https://arxiv.org/abs/2501.20001">Visible</a>'
+
+            class CountingResolver:
+                calls = 0
+
+                def __init__(self, **_kwargs):
+                    pass
+
+                def resolve(self, **_kwargs):
+                    CountingResolver.calls += 1
+                    return type(
+                        "Result",
+                        (),
+                        {
+                            "semantic_paper_id": "",
+                            "resolution_status": "unresolved",
+                            "resolution_method": "none",
+                            "error": "",
+                        },
+                    )()
+
+                def stats(self):
+                    return {
+                        "resolved": 0,
+                        "unresolved": 1,
+                        "errors": 0,
+                        "cache_hits": 0,
+                        "lookups_attempted": 1,
+                        "budget_skips": 0,
+                    }
+
+            with patch("semantic_feedback.SemanticPaperResolver", CountingResolver):
+                out = export_run_feedback_manifest(papers, html, output_dir=td, run_id="run-visible-only")
+
+            self.assertIsNotNone(out)
+            self.assertEqual(CountingResolver.calls, 1)
+
+    def test_manifest_no_key_budget_exhausted_keeps_non_blocking(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            papers = [
+                Paper(
+                    title="P1",
+                    abstract="a",
+                    url="https://arxiv.org/abs/2501.30001",
+                    source=PaperSource.ARXIV,
+                    arxiv_id="2501.30001",
+                ),
+                Paper(
+                    title="P2",
+                    abstract="b",
+                    url="https://arxiv.org/abs/2501.30002",
+                    source=PaperSource.ARXIV,
+                    arxiv_id="2501.30002",
+                ),
+            ]
+            html = (
+                '<a href="https://arxiv.org/abs/2501.30001">P1</a>'
+                '<a href="https://arxiv.org/abs/2501.30002">P2</a>'
+            )
+
+            class BudgetResolver:
+                def __init__(self, **_kwargs):
+                    self.calls = 0
+
+                def resolve(self, **_kwargs):
+                    self.calls += 1
+                    if self.calls == 1:
+                        return type(
+                            "Result",
+                            (),
+                            {
+                                "semantic_paper_id": "",
+                                "resolution_status": "unresolved",
+                                "resolution_method": "title_search",
+                                "error": "",
+                            },
+                        )()
+                    return type(
+                        "Result",
+                        (),
+                        {
+                            "semantic_paper_id": "",
+                            "resolution_status": "error",
+                            "resolution_method": "none",
+                            "error": "budget_exhausted",
+                        },
+                    )()
+
+                def stats(self):
+                    return {
+                        "resolved": 0,
+                        "unresolved": 1,
+                        "errors": 1,
+                        "cache_hits": 0,
+                        "lookups_attempted": 1,
+                        "budget_skips": 1,
+                    }
+
+            with patch("semantic_feedback.SemanticPaperResolver", BudgetResolver):
+                out = export_run_feedback_manifest(
+                    papers,
+                    html,
+                    output_dir=td,
+                    run_id="run-budget",
+                    semantic_scholar_api_key="",
+                    resolver_max_lookups=20,
+                    resolver_no_key_max_lookups=1,
+                    resolver_time_budget_sec=300,
+                )
+            self.assertIsNotNone(out)
+            manifest_path, _ = out
+            manifest = json.loads(Path(manifest_path).read_text())
+            self.assertEqual(len(manifest["papers"]), 2)
+            self.assertFalse(manifest["papers"][1]["feedback_enabled"])
+            self.assertEqual(manifest["papers"][1]["resolution_status"], "error")
+            self.assertEqual(manifest["papers"][1]["resolution_error"], "budget_exhausted")
 
     @patch("semantic_feedback._d1_execute")
     def test_publish_feedback_run_to_d1(self, mock_d1_execute) -> None:
