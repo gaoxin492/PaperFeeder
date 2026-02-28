@@ -182,6 +182,11 @@ Notes:
    - `dry_run=true` first
    - then `dry_run=false` to persist seeds.
 
+Notes:
+- During digest export, report-visible ArXiv/HuggingFace papers now use best-effort Semantic Scholar ID resolution (existing ID -> arXiv mapping -> conservative title match).
+- If resolution fails (rate limit/network/budget), papers remain visible but non-actionable (no per-paper action links).
+- Seed updates still require the apply step; clicking feedback alone does not persist seed changes until apply runs.
+
 Required keys (GitHub Secrets / `.env`):
 
 ```bash

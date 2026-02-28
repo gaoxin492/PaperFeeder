@@ -1,5 +1,34 @@
 # Updates Log
 
+## 2026-02-28
+
+### 1) Cross-Source Feedback Actionability (ArXiv/HF -> Semantic ID) Added
+
+- Feedback manifest export now performs best-effort Semantic Scholar ID resolution for report-visible ArXiv and HuggingFace papers that lack `semantic_paper_id`.
+- Resolution order is deterministic: existing semantic ID -> arXiv ID mapping -> conservative title-match fallback.
+- This increases one-click feedback coverage for cross-source papers without changing apply semantics.
+
+### 2) Manifest Resolution Transparency Added
+
+- Per-paper metadata now records resolution outcome:
+  - `arxiv_id`
+  - `resolution_status`
+  - `resolution_method`
+  - `feedback_enabled`
+  - optional `resolution_error`
+- Manifest also includes run-level resolver stats/warnings for audit/debug.
+
+### 3) Run-Scoped Resolver Budget + Fail-Open Behavior
+
+- Resolver uses run-scoped in-memory cache only (no persisted resolver cache file).
+- Best-effort lookup is bounded by configurable attempt/time budgets (including no-key mode safeguards).
+- On throttling/errors/budget exhaustion, remaining papers are emitted unresolved/non-actionable; digest generation continues.
+
+### 4) Feedback Apply Flow Unchanged
+
+- Link generation/actionability is now broader, but seed updates still happen only through apply (`Apply Feedback Queue` / apply script).
+- Daily operation remains: run digest -> give feedback -> run apply.
+
 ## 2026-02-22
 
 ### 1) Feedback Flow Moved to Web Report Viewer (Email = Notification Only)
