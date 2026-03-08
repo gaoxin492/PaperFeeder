@@ -239,9 +239,9 @@ HTML 格式：
 
         # Papers section prompt
         user_prompt += """
-### Section 1: 🏆 Editor's Choice (Top 1-3 Papers)
+### Section 1: 🏆 Editor's Choice (Top 1-5 Papers)
 
-只选**真正值得读的论文**（不包含博客）。没有就留空，不要凑数。
+只选**真正值得读的论文**（不包含博客，1-5篇）。没有就留空，不要凑数。
 
 每篇包含：
 - **Paper Title** (链接)
@@ -415,6 +415,11 @@ HTML 格式：
             
             for i, paper in enumerate(actual_papers, 1):
                 print(f"      [{i}/{len(actual_papers)}] {paper.title[:40]}...")
+                if not getattr(paper, "pdf_url", None):
+                    failed_pdf_papers.append(paper)
+                    paper._pdf_base64 = None
+                    print("      ⚠️ No pdf_url, fallback to abstract-only")
+                    continue
                 pdf_content = await self.client._url_to_base64_async(
                     paper.pdf_url,
                     save_debug=getattr(self.client, 'debug_save_pdfs', False),
@@ -525,6 +530,7 @@ HTML 格式：
             }}
             
             .header {{
+                background-color: #1a1a2e;
                 background: linear-gradient(135deg, #1a1a2e, #16213e);
                 color: #fff;
                 padding: 20px 24px;
@@ -842,12 +848,12 @@ HTML 格式：
             }}
         </style>
     </head>
-    <body>
+        <body>
         <div class="container">
-            <div class="header">
-                <h1>📚 Paper Digest</h1>
-                <div class="meta">{today_cn} {weekday} · {meta_str}</div>
-                <div class="persona">Curated by PaperFeeder · No fluff, no hype</div>
+            <div class="header" style="background-color:#1a1a2e;background-image:linear-gradient(135deg,#1a1a2e,#16213e);color:#ffffff;">
+                <h1 style="color:#ffffff;">📚 Paper Digest</h1>
+                <div class="meta" style="color:#ffffff;">{today_cn} {weekday} · {meta_str}</div>
+                <div class="persona" style="color:#d6d8e0;">Curated by PaperFeeder · No fluff, no hype</div>
             </div>
             
             <div class="content">

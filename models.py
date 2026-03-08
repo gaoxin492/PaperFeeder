@@ -54,6 +54,7 @@ class Paper:
     
     # External research/enrichment (NEW)
     research_notes: Optional[str] = None  # 存储联网调研信息(GitHub stars, 社区评价等)
+    semantic_paper_id: Optional[str] = None  # Semantic Scholar paperId for memory/suppression
     
     def __hash__(self):
         return hash(self.arxiv_id or self.url)
@@ -79,6 +80,7 @@ class Paper:
             "filter_reason": self.filter_reason,
             "notes": self.notes,
             "research_notes": self.research_notes,
+            "semantic_paper_id": self.semantic_paper_id,
         }
     
     @classmethod
@@ -103,6 +105,7 @@ class Paper:
             filter_reason=data.get("filter_reason"),
             notes=data.get("notes"),
             research_notes=data.get("research_notes"),
+            semantic_paper_id=data.get("semantic_paper_id"),
         )
 
 

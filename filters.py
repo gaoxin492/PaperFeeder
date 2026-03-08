@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
+from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 from models import Paper
@@ -61,6 +64,7 @@ class LLMFilter:
         self.base_url = base_url
         self.model = model
         self.batch_size = batch_size
+        self.debug_dir = Path(os.getenv("LLM_FILTER_DEBUG_DIR", "llm_filter_debug"))
 
     async def filter(
         self, 
@@ -167,12 +171,25 @@ Categories: {categories}"""
             json_match = re.search(r"\[.*\]", result_text, re.DOTALL)
             if not json_match:
                 print(f"   ⚠️ LLM filter: Could not parse response (batch offset {offset})")
-                print(f"   Response preview: {result_text[:200]}...")
+                self._log_parse_failure(
+                    reason="no_json_array_match",
+                    offset=offset,
+                    include_community_signals=include_community_signals,
+                    prompt=prompt,
+                    response_text=result_text,
+                )
                 return self._fallback_scoring(papers)
 
             scores = json.loads(json_match.group())
             if not isinstance(scores, list):
                 print(f"   ⚠️ LLM filter: Invalid response format (batch offset {offset})")
+                self._log_parse_failure(
+                    reason="json_not_list",
+                    offset=offset,
+                    include_community_signals=include_community_signals,
+                    prompt=prompt,
+                    response_text=result_text,
+                )
                 return self._fallback_scoring(papers)
 
             scored_papers: List[Paper] = []
@@ -195,14 +212,63 @@ Categories: {categories}"""
 
         except json.JSONDecodeError as e:
             print(f"   ⚠️ LLM filter JSON error (batch offset {offset}): {e}")
-            if result_text:
-                print(f"   Response preview: {result_text[:200]}...")
+            self._log_parse_failure(
+                reason=f"json_decode_error:{e}",
+                offset=offset,
+                include_community_signals=include_community_signals,
+                prompt=prompt,
+                response_text=result_text,
+            )
             return self._fallback_scoring(papers)
         except Exception as e:
             print(f"   ⚠️ LLM filter error (batch offset {offset}): {type(e).__name__}: {e}")
-            if result_text:
-                print(f"   Response preview: {result_text[:200]}...")
+            self._log_parse_failure(
+                reason=f"runtime_error:{type(e).__name__}:{e}",
+                offset=offset,
+                include_community_signals=include_community_signals,
+                prompt=prompt,
+                response_text=result_text,
+            )
             return self._fallback_scoring(papers)
+
+    def _log_parse_failure(
+        self,
+        reason: str,
+        offset: int,
+        include_community_signals: bool,
+        prompt: str,
+        response_text: Optional[str],
+    ) -> None:
+        """Emit full debug context and save prompt/response for postmortem."""
+        stage = "fine" if include_community_signals else "coarse"
+        response_text = response_text or ""
+        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        self.debug_dir.mkdir(parents=True, exist_ok=True)
+        debug_path = self.debug_dir / f"{stage}_offset{offset}_{ts}.log"
+        debug_payload = (
+            f"reason={reason}\n"
+            f"model={self.model}\n"
+            f"base_url={self.base_url}\n"
+            f"stage={stage}\n"
+            f"batch_offset={offset}\n"
+            f"prompt_chars={len(prompt)}\n"
+            f"response_chars={len(response_text)}\n"
+            "\n=== PROMPT BEGIN ===\n"
+            f"{prompt}\n"
+            "=== PROMPT END ===\n"
+            "\n=== RESPONSE BEGIN ===\n"
+            f"{response_text}\n"
+            "=== RESPONSE END ===\n"
+        )
+        debug_path.write_text(debug_payload)
+        print(
+            "   🧪 LLM filter debug saved: "
+            f"{debug_path} | reason={reason} | model={self.model}"
+        )
+        print("   🧪 Full raw response follows:")
+        print("   ----- RESPONSE BEGIN -----")
+        print(response_text)
+        print("   ----- RESPONSE END -----")
 
     def _build_coarse_filter_prompt(self, papers_text: str, num_papers: int) -> str:
         """

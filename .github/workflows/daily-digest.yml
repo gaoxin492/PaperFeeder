@@ -1,9 +1,12 @@
 name: Daily Paper Digest
 
+permissions:
+  contents: write
+
 on:
-  # Run daily at 7:00 AM UTC (adjust for your timezone)
+  # Run daily at 03:00 UTC (11:00 China time)
   schedule:
-    - cron: '43 23 * * *'
+    - cron: '0 3 * * *'
   
   # Allow manual trigger
   workflow_dispatch:
@@ -21,10 +24,14 @@ on:
 jobs:
   run-digest:
     runs-on: ubuntu-latest
+    env:
+      SEED_STATE_BRANCH: ${{ vars.SEED_STATE_BRANCH }}
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,6 +43,52 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Load semantic state from state branch
+        run: |
+          STATE_BRANCH="${SEED_STATE_BRANCH:-memory-state}"
+          MEMORY_FILE="semantic_scholar_memory.json"
+          SEEDS_FILE="semantic_scholar_seeds.json"
+
+          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null 2>&1; then
+            git fetch --depth=1 origin "$STATE_BRANCH"
+            if git show "origin/$STATE_BRANCH:$MEMORY_FILE" > "$MEMORY_FILE" 2>/dev/null; then
+              echo "Loaded semantic memory from $STATE_BRANCH."
+            else
+              echo "Memory file missing on $STATE_BRANCH, initializing empty."
+              cat > "$MEMORY_FILE" <<'EOF'
+          {
+            "seen": {},
+            "updated_at": ""
+          }
+          EOF
+            fi
+            if git show "origin/$STATE_BRANCH:$SEEDS_FILE" > "$SEEDS_FILE" 2>/dev/null; then
+              echo "Loaded semantic seeds from $STATE_BRANCH."
+            else
+              echo "Seeds file missing on $STATE_BRANCH, initializing empty."
+              cat > "$SEEDS_FILE" <<'EOF'
+          {
+            "positive_paper_ids": [],
+            "negative_paper_ids": []
+          }
+          EOF
+            fi
+          else
+            echo "Branch $STATE_BRANCH not found, initializing empty semantic state."
+            cat > "$MEMORY_FILE" <<'EOF'
+          {
+            "seen": {},
+            "updated_at": ""
+          }
+          EOF
+            cat > "$SEEDS_FILE" <<'EOF'
+          {
+            "positive_paper_ids": [],
+            "negative_paper_ids": []
+          }
+          EOF
+          fi
       
       - name: Run paper digest
         env:
@@ -52,6 +105,11 @@ jobs:
           # 兼容旧配置
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Semantic Scholar memory (optional overrides)
+          SEMANTIC_MEMORY_ENABLED: ${{ github.event.inputs.dry_run == 'true' && 'false' || vars.SEMANTIC_MEMORY_ENABLED }}
+          SEMANTIC_SEEN_TTL_DAYS: ${{ vars.SEMANTIC_SEEN_TTL_DAYS }}
+          SEMANTIC_MEMORY_MAX_IDS: ${{ vars.SEMANTIC_MEMORY_MAX_IDS }}
+          SEMANTIC_SCHOLAR_API_KEY: ${{ secrets.SEMANTIC_SCHOLAR_API_KEY }}
           # Email
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
@@ -59,8 +117,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          # One-click feedback (V3)
+          FEEDBACK_ENDPOINT_BASE_URL: ${{ secrets.FEEDBACK_ENDPOINT_BASE_URL }}
+          FEEDBACK_LINK_SIGNING_SECRET: ${{ secrets.FEEDBACK_LINK_SIGNING_SECRET }}
+          FEEDBACK_TOKEN_TTL_DAYS: ${{ vars.FEEDBACK_TOKEN_TTL_DAYS }}
+          FEEDBACK_REVIEWER: ${{ vars.FEEDBACK_REVIEWER }}
         run: |
-          DAYS="${{ github.event.inputs.days_back || '1' }}"
+          DAYS="${{ github.event.inputs.days_back || '3' }}"
           DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
           
           if [ "$DRY_RUN" = "true" ]; then
@@ -68,6 +131,48 @@ jobs:
           else
             python main.py --days $DAYS
           fi
+
+      - name: Persist semantic memory state to state branch
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATE_BRANCH="${SEED_STATE_BRANCH:-memory-state}"
+          MEMORY_FILE="semantic_scholar_memory.json"
+
+          if [ ! -f semantic_scholar_memory.json ]; then
+            echo "No semantic memory file found, skipping."
+            exit 0
+          fi
+
+          TMP_DIR="$(mktemp -d)"
+          REMOTE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --depth 1 --branch "$STATE_BRANCH" "$REMOTE_URL" "$TMP_DIR/repo"
+          else
+            git clone --depth 1 "$REMOTE_URL" "$TMP_DIR/repo"
+            (
+              cd "$TMP_DIR/repo"
+              git checkout --orphan "$STATE_BRANCH"
+              git rm -rf . >/dev/null 2>&1 || true
+            )
+          fi
+
+          cp "$MEMORY_FILE" "$TMP_DIR/repo/$MEMORY_FILE"
+
+          (
+            cd "$TMP_DIR/repo"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$MEMORY_FILE"
+            if git diff --cached --quiet; then
+              echo "No semantic memory changes to persist on $STATE_BRANCH."
+              exit 0
+            fi
+            git commit -m "chore: update semantic scholar memory [skip ci]"
+            git push origin "HEAD:$STATE_BRANCH" || echo "Memory push failed; continuing without failing workflow."
+          )
       
       - name: Upload report artifact (on dry run)
         if: ${{ github.event.inputs.dry_run == 'true' }}
@@ -76,3 +181,26 @@ jobs:
           name: paper-report
           path: report_preview.html
           retention-days: 7
+
+      - name: Package feedback artifacts
+        if: always()
+        run: |
+          echo "ZIP_NAME=" >> "$GITHUB_ENV"
+          shopt -s nullglob
+          FILES=(artifacts/run_feedback_manifest_*.json artifacts/semantic_feedback_template_*.json)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No feedback files found to package."
+            exit 0
+          fi
+          ZIP_NAME="feedback-artifacts-${GITHUB_RUN_ID}.zip"
+          zip -j "$ZIP_NAME" "${FILES[@]}"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload feedback artifacts
+        if: ${{ always() && env.ZIP_NAME != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-artifacts-${{ github.run_id }}
+          path: ${{ env.ZIP_NAME }}
+          if-no-files-found: warn
+          retention-days: 14

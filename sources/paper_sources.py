@@ -9,12 +9,13 @@ import asyncio
 import aiohttp
 import json
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
-from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import Optional, List, Dict, Any
 import re
 
 from models import Paper, Author, PaperSource
 from .base import BaseSource
+from semantic_memory import SemanticMemoryStore, memory_keys_for_paper
 
 
 class ArxivSource(BaseSource):
@@ -56,7 +57,7 @@ class ArxivSource(BaseSource):
                     connect=30,     # 连接超时
                     sock_read=90    # 读取超时
                 )
-                async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                     async with session.get(self.BASE_URL, params=params) as response:
                         if response.status != 200:
                             print(f"      ❌ arXiv API error: {response.status}")
@@ -93,7 +94,7 @@ class ArxivSource(BaseSource):
         root = ET.fromstring(xml_content)
         ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
         
-        cutoff_date = datetime.now() - timedelta(days=days_back)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
         
         for entry in root.findall("atom:entry", ns):
             try:
@@ -102,7 +103,7 @@ class ArxivSource(BaseSource):
                 published_date = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
                 
                 # Skip if too old
-                if published_date.replace(tzinfo=None) < cutoff_date:
+                if published_date < cutoff_date:
                     continue
                 
                 # Extract arxiv ID from URL
@@ -178,7 +179,7 @@ class HuggingFaceSource(BaseSource):
             
             try:
                 timeout = aiohttp.ClientTimeout(total=30)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                     async with session.get(url) as response:
                         if response.status != 200:
                             print(f"      ❌ HTTP {response.status}, trying next...")
@@ -312,7 +313,7 @@ class ManualSource(BaseSource):
         """Fetch a single paper from arXiv by ID."""
         url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             async with session.get(url) as response:
                 if response.status != 200:
                     return None
@@ -348,10 +349,211 @@ class ManualSource(BaseSource):
 # For future expansion
 class SemanticScholarSource(BaseSource):
     """Fetch papers from Semantic Scholar API."""
-    
+
+    RECOMMEND_URL = "https://api.semanticscholar.org/recommendations/v1/papers/"
+
+    def __init__(
+        self,
+        api_key: str = "",
+        seeds_path: str = "semantic_scholar_seeds.json",
+        max_results: int = 50,
+        memory_store: SemanticMemoryStore | None = None,
+        seen_ttl_days: int = 30,
+    ):
+        self.api_key = api_key or ""
+        self.seeds_path = seeds_path
+        self.max_results = max_results
+        self.memory_store = memory_store
+        self.seen_ttl_days = seen_ttl_days
+        self.last_stats: Dict[str, int] = {
+            "total": 0,
+            "suppressed": 0,
+            "forwarded": 0,
+        }
+
     async def fetch(self, **kwargs) -> List[Paper]:
-        # TODO: Implement
+        seeds = self._load_seeds()
+        positive_ids = self._normalize_seed_ids(seeds.get("positive_paper_ids", []) or [])
+        negative_ids = self._normalize_seed_ids(seeds.get("negative_paper_ids", []) or [])
+
+        if not positive_ids:
+            print("      ⚠️ Semantic Scholar: no positive seed IDs found, skipping")
+            return []
+
+        payload = {
+            "positivePaperIds": positive_ids[:100],
+            "negativePaperIds": negative_ids[:100],
+        }
+        params = {
+            "limit": min(max(self.max_results, 1), 500),
+            "fields": "paperId,title,abstract,authors,year,venue,url,externalIds",
+        }
+
+        headers = {}
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                timeout = aiohttp.ClientTimeout(total=40)
+                async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
+                    async with session.post(
+                        self.RECOMMEND_URL,
+                        headers=headers,
+                        params=params,
+                        json=payload,
+                    ) as response:
+                        if response.status in (401, 403):
+                            print(f"      ⚠️ Semantic Scholar auth error: HTTP {response.status}")
+                            return []
+                        if response.status == 429:
+                            if attempt < max_retries - 1:
+                                backoff = 2 ** (attempt + 1)
+                                print(f"      ⚠️ Semantic Scholar rate limited (429), retry in {backoff}s...")
+                                await asyncio.sleep(backoff)
+                                continue
+                            print("      ⚠️ Semantic Scholar rate limited (429), giving up")
+                            return []
+                        if response.status != 200:
+                            body = await response.text()
+                            print(f"      ⚠️ Semantic Scholar API error: HTTP {response.status} - {body[:120]}")
+                            return []
+
+                        data = await response.json()
+                        papers = self._to_papers(data)
+                        return self._apply_seen_suppression(papers)
+
+            except asyncio.TimeoutError:
+                if attempt < max_retries - 1:
+                    backoff = 2 ** (attempt + 1)
+                    print(f"      ⚠️ Semantic Scholar timeout, retry in {backoff}s...")
+                    await asyncio.sleep(backoff)
+                    continue
+                print("      ⚠️ Semantic Scholar timeout, giving up")
+                return []
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    backoff = 2 ** (attempt + 1)
+                    print(f"      ⚠️ Semantic Scholar error ({type(e).__name__}), retry in {backoff}s...")
+                    await asyncio.sleep(backoff)
+                    continue
+                print(f"      ⚠️ Semantic Scholar error: {type(e).__name__}: {e}")
+                return []
+
         return []
+
+    def _load_seeds(self) -> Dict[str, Any]:
+        try:
+            with open(self.seeds_path, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except FileNotFoundError:
+            print(f"      ⚠️ Semantic Scholar seeds file not found: {self.seeds_path}")
+        except Exception as e:
+            print(f"      ⚠️ Failed to read Semantic Scholar seeds: {e}")
+        return {"positive_paper_ids": [], "negative_paper_ids": []}
+
+    def _normalize_seed_ids(self, ids: List[Any]) -> List[str]:
+        """
+        Normalize seed IDs for Semantic Scholar API.
+
+        Accepts:
+        - Corpus IDs as int/str (e.g., 282913080 / "282913080") -> "CorpusId:282913080"
+        - Prefixed IDs (e.g., "CorpusId:...", "ARXIV:...", "S2PaperId:...") -> unchanged
+        """
+        normalized: List[str] = []
+        for raw in ids:
+            if raw is None:
+                continue
+            s = str(raw).strip()
+            if not s:
+                continue
+            if ":" in s:
+                normalized.append(s)
+            elif s.isdigit():
+                normalized.append(f"CorpusId:{s}")
+            else:
+                # Fallback: pass through as-is for potential hash-style paper IDs
+                normalized.append(s)
+        return normalized
+
+    def _to_papers(self, data: Dict[str, Any]) -> List[Paper]:
+        recs = data.get("recommendedPapers", []) if isinstance(data, dict) else []
+        papers: List[Paper] = []
+
+        for item in recs:
+            try:
+                paper_id = item.get("paperId")
+                title = item.get("title") or ""
+                abstract = item.get("abstract") or ""
+                url = item.get("url") or f"https://www.semanticscholar.org/paper/{paper_id}"
+
+                authors = []
+                for a in item.get("authors", [])[:20]:
+                    name = a.get("name")
+                    if name:
+                        authors.append(Author(name=name))
+
+                external_ids = item.get("externalIds") or {}
+                arxiv_id = external_ids.get("ArXiv")
+                pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf" if arxiv_id else None
+
+                year = item.get("year")
+                published_date = None
+                if isinstance(year, int) and year > 0:
+                    published_date = datetime(year, 1, 1)
+
+                papers.append(
+                    Paper(
+                        title=title,
+                        abstract=abstract,
+                        url=f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else url,
+                        source=PaperSource.SEMANTIC_SCHOLAR,
+                        arxiv_id=arxiv_id,
+                        authors=authors,
+                        published_date=published_date,
+                        notes=f"Semantic Scholar paperId={paper_id}",
+                        semantic_paper_id=paper_id,
+                        pdf_url=pdf_url,
+                    )
+                )
+            except Exception as e:
+                print(f"Error parsing Semantic Scholar paper: {e}")
+                continue
+
+        return papers
+
+    def _apply_seen_suppression(self, papers: List[Paper]) -> List[Paper]:
+        total = len(papers)
+        if not self.memory_store:
+            self.last_stats = {"total": total, "suppressed": 0, "forwarded": total}
+            return papers
+
+        try:
+            filtered: List[Paper] = []
+            for paper in papers:
+                keys = memory_keys_for_paper(paper)
+                if keys and self.memory_store.recently_seen_any(keys, ttl_days=self.seen_ttl_days):
+                    continue
+                filtered.append(paper)
+            suppressed = total - len(filtered)
+            self.last_stats = {
+                "total": total,
+                "suppressed": suppressed,
+                "forwarded": len(filtered),
+            }
+            print(
+                "      📉 Semantic Scholar suppression: "
+                f"total={total}, suppressed={suppressed}, forwarded={len(filtered)}"
+            )
+            return filtered
+        except Exception as e:
+            # Fail open so digest generation remains stable.
+            print(f"      ⚠️ Semantic Scholar suppression failed, proceeding without suppression: {e}")
+            self.last_stats = {"total": total, "suppressed": 0, "forwarded": total}
+            return papers
 
 
 class OpenReviewSource(BaseSource):

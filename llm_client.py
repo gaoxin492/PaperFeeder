@@ -463,7 +463,8 @@ class LLMClient:
                     print(f"      ✓ PDF processed: {len(content)} bytes -> base64 length: {len(pdf_base64)}")
                     return pdf_base64
         except Exception as e:
-            print(f"      ⚠️ PDF download failed for {url[:50]}...: {e}")
+            url_preview = str(url)[:50] if url is not None else "<none>"
+            print(f"      ⚠️ PDF download failed for {url_preview}...: {e}")
             return None
     
     def _extract_pdf_text_from_base64(self, pdf_base64: str) -> str:

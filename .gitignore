@@ -21,12 +21,19 @@ ENV/
 report_preview.html
 email_preview.html
 *.log
+artifacts/
+semantic_feedback.json
+semantic_feedback_queue.json
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Local agent/workflow artifacts
+.codex/
+openspec/
 
 # OS
 .DS_Store

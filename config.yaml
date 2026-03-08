@@ -8,9 +8,9 @@
 arxiv_categories:
   - cs.LG   # Machine Learning
   - cs.CL   # Computation and Language
-  - cs.CV   # Computer Vision
+  # - cs.CV   # Computer Vision
   - cs.AI   # Artificial Intelligence
-  - stat.ML # Statistics - Machine Learning
+  # - stat.ML # Statistics - Machine Learning
 
 # =============================================================================
 # Keywords for filtering (matches title + abstract)
@@ -22,33 +22,30 @@ keywords:
   - hierarchical reasoning
   - mathematical reasoning
   - chain of thought
-  - diffusion language model      # Diffusion for discrete domains - hot frontier
-  - llada
   - latent reasoning          # Reasoning in latent space, not token space
   - mechanistic interpretability  # Understanding what's inside the black box
   - test-time compute         # Scaling inference, not just training
   - inference scaling         # Related to test-time compute
-  - tokenizer
-  - tokenization
-  - system 2
+  - test time training
+  - formal language reasoning
+  - verifiable coding agent
+  - AI safety
+  - alignment
+  - self-evolution
+  - self-play
   
   # --- Tier 2: Wide Net (泛化词，捕捉跨界大新闻，需配合 exclude 过滤噪音) ---
   - LLM
   - Large Language Model
-  - flow matching             # Next-gen generative paradigm
+  # - flow matching             # Next-gen generative paradigm
   - Scaling Law
   - Alignment
-  - Generative
   - Foundation Model
-  - representation learning
 
 # =============================================================================
 # Exclude Keywords (严格过滤，防止 Tier 2 词带来噪音)
 # =============================================================================
 exclude_keywords:
-  - self-play
-  - agent
-
   # Application domains we don't care about
   - medical
   - biomedical
@@ -99,19 +96,20 @@ research_interests: |
   
   
   ## Specific Technical Interests
-  
-  - **Generative Models**: 
-    - Unifying Autoregressive and Diffusion models.
-    - Discrete diffusion, Flow matching, and non-image modalities (Language, Planning).
-  - **Reasoning & System 2**: 
-    - Hierarchical Reasoning, Mathematical Reasoning, Chain of Thought, Latent Reasoning.
-    - Inference-time compute scaling (o1-like), Tree Search.
-  - **Representation Learning (JEPA)**: 
-    - **LeCun-style Joint Embedding Architectures (I-JEPA, V-JEPA)**.
-    - NOT interested in simple pixel-level reconstruction, such as video generation.
+
   - **AI Safety & Alignment**: 
     - Mechanistic Interpretability, transparency, Scalable Oversight, Weak-to-Strong Generalization.
+    - AI safety with formal verification like Dafny or Lean.
     - NOT interested in simple prompt-based jailbreaks.
+  - **Mechanistic Reasoning Circuits**:
+    - Circuit-level interpretability for CoT reasoning: attribution graphs, causal tracing, and sparse subnetwork extraction.
+    - Reasoning verification via deterministic circuit fingerprints that detect genuine reasoning vs shortcut behavior.
+    - Data-centric reasoning optimization: post-training data selection/filtering and skill-guided synthesis across pre-train, mid-train, and RL.
+  - **Reasoning & System 2**: 
+    - Formal language reasoning: theorem proving, symbolic manipulation, code generation using the singal from the formal verifier.
+    - Hierarchical Reasoning, Mathematical Reasoning, Chain of Thought, Latent Reasoning.
+    - Test time training, meta-learning, and fast adaptation. Especially in-context adaptation and learning.
+    - Self-evolution and self-play for continual improvement without human data.
 
   ## What You DESPISE (Instant Pass)
   
@@ -126,8 +124,8 @@ research_interests: |
 # Filtering settings
 # =============================================================================
 llm_filter_enabled: true     # Enable LLM-based filtering
-llm_filter_threshold: 3      # Use LLM filter if keyword-filtered papers > N
-max_papers: 3                # Maximum papers in final report (slightly higher for flexibility)
+llm_filter_threshold: 6      # Use LLM filter if keyword-filtered papers > N
+max_papers: 10                # Maximum papers in final report (slightly higher for flexibility)
 
 # =============================================================================
 # PDF Multimodal Input
@@ -143,13 +141,26 @@ manual_source_enabled: false
 manual_source_path: "manual_papers.json"
 
 # =============================================================================
+# Semantic Scholar recommendation source
+# =============================================================================
+# Uses seed-based recommendations with optional API key.
+# If API key is absent, unauthenticated requests are still attempted.
+semantic_scholar_enabled: true
+semantic_scholar_max_results: 50
+semantic_scholar_seeds_path: "semantic_scholar_seeds.json"
+semantic_memory_enabled: true
+semantic_memory_path: "semantic_scholar_memory.json"
+semantic_seen_ttl_days: 30
+semantic_memory_max_ids: 5000
+
+# =============================================================================
 # Blog Source Settings (NEW!)
 # =============================================================================
 # Enable blog fetching from RSS feeds
 blogs_enabled: true
 
 # How many days back to look for blog posts
-blog_days_back: 1
+blog_days_back: 2
 
 # Which blogs to enable
 # If not specified (null), uses all priority blogs by default
@@ -179,12 +190,19 @@ enabled_blogs:
   - nvidia_research   # NVIDIA Research (替代 NVIDIA Blog，关注底层论文)
   - alignment_forum   # AI Alignment Forum (对齐领域深度讨论)
   - lesswrong_ai      # LessWrong AI Tag (跨学科 AI 思考)
+  - sakana_ai         # Sakana AI Blog
 
 
 # Custom blogs (add your own RSS feeds)
 # Format: key -> {name, feed_url, website, priority}
 # priority: true = 直接进入报告；false = 参与筛选流程
 custom_blogs:
+  sakana_ai:
+    name: "Sakana AI Blog"
+    feed_url: "https://sakana.ai/feed.xml"
+    website: "https://sakana.ai/blog/"
+    priority: true
+
   # Example: Uncomment to add your own blogs
   # my_favorite_blog:
   #   name: "My Favorite AI Blog"

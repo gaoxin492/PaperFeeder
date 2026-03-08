@@ -10,18 +10,31 @@ from __future__ import annotations
 
 import asyncio
 import argparse
+import base64
 import os
+import re
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional, List
+from urllib.parse import urlsplit, urlunsplit
 
-from sources import ArxivSource, HuggingFaceSource, ManualSource, BlogSource
+from sources import ArxivSource, HuggingFaceSource, ManualSource, SemanticScholarSource, BlogSource
 from sources.blog_sources import fetch_blog_posts
 from filters import KeywordFilter, LLMFilter
 from researcher import PaperResearcher, MockPaperResearcher
 from summarizer import PaperSummarizer
 from emailer import ResendEmailer, FileEmailer
 from config import Config
-from models import Paper
+from models import Paper, PaperSource
+from semantic_memory import SemanticMemoryStore, memory_keys_for_paper
+from semantic_feedback import (
+    build_feedback_run_view_url,
+    export_run_feedback_manifest,
+    get_run_id_from_manifest,
+    inject_feedback_actions_into_report,
+    inject_feedback_entry_link,
+    publish_feedback_run_to_d1,
+)
 
 # Check if blog sources are available (feedparser required)
 try:
@@ -35,11 +48,47 @@ except ImportError:
 async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
     """Stage 1: Fetch papers from all sources (Recall)."""
     papers = []
+    memory_store = None
+
+    setattr(config, "_semantic_memory_store", None)
+    if getattr(config, "semantic_memory_enabled", True):
+        memory_store = SemanticMemoryStore(
+            path=getattr(config, "semantic_memory_path", "semantic_scholar_memory.json"),
+            max_ids=getattr(config, "semantic_memory_max_ids", 5000),
+        )
+        memory_store.load()
+        pruned = memory_store.prune_expired(getattr(config, "semantic_seen_ttl_days", 30))
+        if pruned:
+            print(f"      🧹 Semantic memory pruned expired seen IDs: {pruned}")
+        setattr(config, "_semantic_memory_store", memory_store)
+
+    def suppress_by_memory(candidates: List[Paper], source_label: str) -> List[Paper]:
+        if not memory_store:
+            return candidates
+        try:
+            ttl_days = getattr(config, "semantic_seen_ttl_days", 30)
+            filtered: List[Paper] = []
+            for paper in candidates:
+                keys = memory_keys_for_paper(paper)
+                if keys and memory_store.recently_seen_any(keys, ttl_days=ttl_days):
+                    continue
+                filtered.append(paper)
+            suppressed = len(candidates) - len(filtered)
+            if suppressed:
+                print(
+                    f"      📉 {source_label} suppression: "
+                    f"total={len(candidates)}, suppressed={suppressed}, forwarded={len(filtered)}"
+                )
+            return filtered
+        except Exception as e:
+            print(f"      ⚠️ {source_label} suppression failed, proceeding without suppression: {e}")
+            return candidates
     
     # arXiv
     print("📚 Fetching from arXiv...")
     arxiv_source = ArxivSource(config.arxiv_categories)
     arxiv_papers = await arxiv_source.fetch(days_back=days_back, max_results=300)
+    arxiv_papers = suppress_by_memory(arxiv_papers, "arXiv")
     papers.extend(arxiv_papers)
     print(f"   Found {len(arxiv_papers)} papers")
     
@@ -47,6 +96,7 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
     print("🤗 Fetching from HuggingFace Daily Papers...")
     hf_source = HuggingFaceSource()
     hf_papers = await hf_source.fetch()
+    hf_papers = suppress_by_memory(hf_papers, "HuggingFace")
     papers.extend(hf_papers)
     print(f"   Found {len(hf_papers)} papers")
     
@@ -57,6 +107,28 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
         manual_papers = await manual_source.fetch()
         papers.extend(manual_papers)
         print(f"   Found {len(manual_papers)} papers")
+
+    # Semantic Scholar recommendations (seed-based)
+    if getattr(config, "semantic_scholar_enabled", False):
+        print("🧠 Fetching from Semantic Scholar recommendations...")
+        s2_source = SemanticScholarSource(
+            api_key=getattr(config, "semantic_scholar_api_key", ""),
+            seeds_path=getattr(config, "semantic_scholar_seeds_path", "semantic_scholar_seeds.json"),
+            max_results=getattr(config, "semantic_scholar_max_results", 50),
+            memory_store=memory_store,
+            seen_ttl_days=getattr(config, "semantic_seen_ttl_days", 30),
+        )
+        s2_papers = await s2_source.fetch()
+        papers.extend(s2_papers)
+        print(f"   Found {len(s2_papers)} papers")
+        stats = getattr(s2_source, "last_stats", None)
+        if stats:
+            print(
+                "   📊 Semantic Scholar stats: "
+                f"total={stats.get('total', 0)}, "
+                f"suppressed={stats.get('suppressed', 0)}, "
+                f"forwarded={stats.get('forwarded', 0)}"
+            )
     
     # Deduplicate by arxiv_id or url
     seen = set()
@@ -69,6 +141,87 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
     
     print(f"✅ Total unique papers: {len(unique_papers)}")
     return unique_papers
+
+
+def _normalize_url_for_match(url: str) -> str:
+    """Normalize URL for robust report-to-paper matching."""
+    if not url:
+        return ""
+    try:
+        parts = urlsplit(url.strip())
+        scheme = parts.scheme.lower() if parts.scheme else "https"
+        netloc = parts.netloc.lower()
+        path = parts.path.rstrip("/")
+        return urlunsplit((scheme, netloc, path, "", ""))
+    except Exception:
+        return url.strip().lower().rstrip("/")
+
+
+def _extract_report_urls(report_html: str) -> set[str]:
+    """Extract all href URLs from rendered report HTML."""
+    if not report_html:
+        return set()
+    urls = set()
+    for raw in re.findall(r'href=["\']([^"\']+)["\']', report_html, flags=re.IGNORECASE):
+        norm = _normalize_url_for_match(raw)
+        if norm:
+            urls.add(norm)
+    return urls
+
+
+def update_semantic_memory_from_report(final_papers: List[Paper], report_html: str, config: Config) -> None:
+    """Mark only report-visible final papers as seen and persist cross-source memory."""
+    if not getattr(config, "semantic_memory_enabled", True):
+        return
+
+    memory_store = getattr(config, "_semantic_memory_store", None)
+    if memory_store is None:
+        return
+
+    report_urls = _extract_report_urls(report_html)
+    final_memory_candidates = [
+        p
+        for p in final_papers
+        if getattr(p, "source", None) in {
+            PaperSource.SEMANTIC_SCHOLAR,
+            PaperSource.ARXIV,
+            PaperSource.HUGGINGFACE,
+        }
+    ]
+    if not final_memory_candidates:
+        print("   ⭕ Semantic memory: no final papers eligible for memory")
+        return
+
+    visible_papers = [
+        p for p in final_memory_candidates
+        if _normalize_url_for_match(getattr(p, "url", "")) in report_urls
+    ]
+    if not visible_papers:
+        print(
+            "   ⭕ Semantic memory: no report-visible final papers to update "
+            f"(final_selected={len(final_memory_candidates)})"
+        )
+        return
+
+    visible_keys = sorted({k for paper in visible_papers for k in memory_keys_for_paper(paper)})
+    if not visible_keys:
+        print(
+            "   ⭕ Semantic memory: report-visible papers had no usable memory keys "
+            f"(report_visible={len(visible_papers)})"
+        )
+        return
+
+    try:
+        memory_store.mark_seen(visible_keys)
+        removed = memory_store.prune_expired(getattr(config, "semantic_seen_ttl_days", 30))
+        memory_store.save()
+        print(
+            "   ✅ Semantic memory updated: "
+            f"final_selected={len(final_memory_candidates)}, report_visible={len(visible_papers)}, "
+            f"seen_keys_added={len(visible_keys)}, expired_removed={removed}"
+        )
+    except Exception as e:
+        print(f"   ⚠️ Semantic memory update failed (non-blocking): {e}")
 
 
 async def fetch_blogs(config: Config, days_back: int = 7) -> tuple[List[Paper], List[Paper]]:
@@ -213,7 +366,8 @@ async def filter_papers_fine(papers: List[Paper], config: Config) -> List[Paper]
         print("   LLM filter disabled, returning all papers")
         return papers[:config.max_papers]
     
-    filter_api_key = config.llm_filter_api_key or config.llm_api_key
+    # Fine ranking uses filter model settings (same provider path as filtering stage).
+    filter_api_key = config.llm_filter_api_key
     filter_base_url = config.llm_filter_base_url
     filter_model = config.llm_filter_model
     
@@ -295,7 +449,7 @@ async def summarize_papers(papers: list[Paper], config: Config, priority_blogs: 
     return report
 
 
-async def send_email(report: str, config: Config) -> bool:
+async def send_email(report: str, config: Config, attachments: Optional[List[dict]] = None) -> bool:
     """Send the report via email."""
     print(f"\n📧 Sending email to {config.email_to}...")
     
@@ -310,7 +464,8 @@ async def send_email(report: str, config: Config) -> bool:
     success = await emailer.send(
         to=config.email_to,
         subject=subject,
-        html_content=report
+        html_content=report,
+        attachments=attachments or [],
     )
     
     if success:
@@ -319,6 +474,24 @@ async def send_email(report: str, config: Config) -> bool:
         print("   ❌ Failed to send email")
     
     return success
+
+
+def _build_email_attachments(paths: List[str]) -> List[dict]:
+    """Build base64 email attachments from local files."""
+    attachments: List[dict] = []
+    for p in paths:
+        path = Path(p)
+        if not path.exists() or not path.is_file():
+            continue
+        content = base64.b64encode(path.read_bytes()).decode("ascii")
+        attachments.append(
+            {
+                "filename": path.name,
+                "content": content,
+                "content_type": "application/json",
+            }
+        )
+    return attachments
 
 
 async def run_pipeline(config_path: str = "config.yaml", days_back: int = 1, dry_run: bool = False, no_papers: bool = False, no_blogs: bool = False):
@@ -406,12 +579,69 @@ async def run_pipeline(config_path: str = "config.yaml", days_back: int = 1, dry
     if not final_papers and not all_blogs:
         print("\n⚠️ No papers passed fine filter and no blogs. Exiting.")
         return
-    
+
     # Stage 6: Synthesize (includes all blogs!)
     print("\n" + "=" * 80)
     print("STAGE 6: SYNTHESIS (Report Generation)")
     print("=" * 80)
     report = await summarize_papers(final_papers, config, priority_blogs=all_blogs)
+
+    email_report = report
+    # Export feedback manifest for human-in-the-loop seed updates (non-blocking).
+    try:
+        feedback_artifacts = export_run_feedback_manifest(
+            final_papers,
+            report,
+            output_dir="artifacts",
+            feedback_endpoint_base_url=getattr(config, "feedback_endpoint_base_url", ""),
+            feedback_link_signing_secret=getattr(config, "feedback_link_signing_secret", ""),
+            reviewer=getattr(config, "feedback_reviewer", "") or getattr(config, "email_to", ""),
+            token_ttl_days=getattr(config, "feedback_token_ttl_days", 7),
+            semantic_scholar_api_key=getattr(config, "semantic_scholar_api_key", ""),
+            resolver_enabled=getattr(config, "feedback_resolution_enabled", True),
+            resolver_timeout_sec=getattr(config, "feedback_resolution_timeout_sec", 8),
+            resolver_max_lookups=getattr(config, "feedback_resolution_max_lookups", 25),
+            resolver_no_key_max_lookups=getattr(config, "feedback_resolution_no_key_max_lookups", 10),
+            resolver_time_budget_sec=getattr(config, "feedback_resolution_time_budget_sec", 20),
+            resolver_run_cache_enabled=getattr(config, "feedback_resolution_run_cache_enabled", True),
+        )
+        if feedback_artifacts:
+            manifest_path, questionnaire_path = feedback_artifacts
+            print(f"   ✅ Feedback manifest exported: {manifest_path}")
+            print(f"   ✅ Feedback questionnaire template exported: {questionnaire_path}")
+            try:
+                web_report = inject_feedback_actions_into_report(report, str(manifest_path))
+                run_id = get_run_id_from_manifest(str(manifest_path))
+                run_view_url = build_feedback_run_view_url(
+                    getattr(config, "feedback_endpoint_base_url", ""),
+                    run_id,
+                )
+                if run_view_url:
+                    email_report = inject_feedback_entry_link(report, run_view_url)
+                    print("   ✅ Web feedback entry link injected into email report")
+                else:
+                    print("   ⚠️ Feedback endpoint base URL missing; skipped web feedback entry link")
+
+                try:
+                    publish_feedback_run_to_d1(
+                        manifest_path=str(manifest_path),
+                        report_html=web_report,
+                        account_id=getattr(config, "cloudflare_account_id", ""),
+                        api_token=getattr(config, "cloudflare_api_token", ""),
+                        database_id=getattr(config, "d1_database_id", ""),
+                    )
+                    print("   ✅ Published web viewer report to D1")
+                except Exception as e:
+                    print(f"   ⚠️ D1 run publish failed (non-blocking): {e}")
+            except Exception as e:
+                print(f"   ⚠️ Feedback web-view build failed (non-blocking): {e}")
+        else:
+            print("   ⭕ Feedback manifest: no report-visible papers to export")
+    except Exception as e:
+        print(f"   ⚠️ Feedback manifest export failed (non-blocking): {e}")
+
+    # Persist seen-memory only for report-visible final papers (non-blocking).
+    update_semantic_memory_from_report(final_papers, report, config)
     
     # Output/Send
     print("\n" + "=" * 80)
@@ -424,11 +654,11 @@ async def run_pipeline(config_path: str = "config.yaml", days_back: int = 1, dry
         await file_emailer.send(
             to=config.email_to,
             subject=f"Paper Digest - {datetime.now().strftime('%Y-%m-%d')}",
-            html_content=report
+            html_content=email_report
         )
         print("✅ Report saved to report_preview.html")
     else:
-        await send_email(report, config)
+        await send_email(email_report, config)
     
     print("\n" + "=" * 80)
     print("✨ Pipeline Complete!")

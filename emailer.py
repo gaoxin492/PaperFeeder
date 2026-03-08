@@ -18,6 +18,7 @@ class BaseEmailer(ABC):
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> bool:
         pass
 
@@ -37,6 +38,7 @@ class ResendEmailer(BaseEmailer):
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> bool:
         """Send an email using Resend."""
         
@@ -54,6 +56,8 @@ class ResendEmailer(BaseEmailer):
         
         if text_content:
             payload["text"] = text_content
+        if attachments:
+            payload["attachments"] = attachments
         
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -84,6 +88,7 @@ class SendGridEmailer(BaseEmailer):
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> bool:
         """Send an email using SendGrid."""
         
@@ -101,6 +106,16 @@ class SendGridEmailer(BaseEmailer):
         
         if text_content:
             payload["content"].insert(0, {"type": "text/plain", "value": text_content})
+        if attachments:
+            payload["attachments"] = [
+                {
+                    "content": a.get("content", ""),
+                    "filename": a.get("filename", "attachment.bin"),
+                    "type": a.get("content_type", "application/octet-stream"),
+                    "disposition": "attachment",
+                }
+                for a in attachments
+            ]
         
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -125,6 +140,7 @@ class ConsoleEmailer(BaseEmailer):
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> bool:
         """Print email to console."""
         print("\n" + "=" * 60)
@@ -150,6 +166,7 @@ class FileEmailer(BaseEmailer):
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> bool:
         """Save email to file."""
         try:

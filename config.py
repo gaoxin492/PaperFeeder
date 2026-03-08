@@ -106,6 +106,14 @@ class Config:
     papers_enabled: bool = True            # Enable fetching from paper sources (arXiv, HF, Manual)
     manual_source_enabled: bool = True
     manual_source_path: str = "manual_papers.json"  # Or D1 connection string
+    semantic_scholar_enabled: bool = False
+    semantic_scholar_api_key: str = ""
+    semantic_scholar_max_results: int = 30
+    semantic_scholar_seeds_path: str = "semantic_scholar_seeds.json"
+    semantic_memory_enabled: bool = True
+    semantic_memory_path: str = "semantic_scholar_memory.json"
+    semantic_seen_ttl_days: int = 30
+    semantic_memory_max_ids: int = 5000
     
     # =============================================================================
     # Blog Source Settings (NEW!)
@@ -130,6 +138,18 @@ class Config:
     cloudflare_api_token: str = ""
     d1_database_id: str = ""
     
+    # V3 one-click feedback settings
+    feedback_endpoint_base_url: str = ""
+    feedback_link_signing_secret: str = ""
+    feedback_token_ttl_days: int = 7
+    feedback_reviewer: str = ""
+    feedback_resolution_enabled: bool = True
+    feedback_resolution_timeout_sec: int = 8
+    feedback_resolution_max_lookups: int = 25
+    feedback_resolution_no_key_max_lookups: int = 10
+    feedback_resolution_time_budget_sec: int = 20
+    feedback_resolution_run_cache_enabled: bool = True
+    
     @classmethod
     def from_yaml(cls, path: str) -> "Config":
         """Load config from YAML file, with env var overrides."""
@@ -153,8 +173,26 @@ class Config:
             "cloudflare_account_id": os.getenv("CLOUDFLARE_ACCOUNT_ID"),
             "cloudflare_api_token": os.getenv("CLOUDFLARE_API_TOKEN"),
             "d1_database_id": os.getenv("D1_DATABASE_ID"),
+            "feedback_endpoint_base_url": os.getenv("FEEDBACK_ENDPOINT_BASE_URL"),
+            "feedback_link_signing_secret": os.getenv("FEEDBACK_LINK_SIGNING_SECRET"),
+            "feedback_token_ttl_days": os.getenv("FEEDBACK_TOKEN_TTL_DAYS"),
+            "feedback_reviewer": os.getenv("FEEDBACK_REVIEWER"),
+            "feedback_resolution_enabled": os.getenv("FEEDBACK_RESOLUTION_ENABLED"),
+            "feedback_resolution_timeout_sec": os.getenv("FEEDBACK_RESOLUTION_TIMEOUT_SEC"),
+            "feedback_resolution_max_lookups": os.getenv("FEEDBACK_RESOLUTION_MAX_LOOKUPS"),
+            "feedback_resolution_no_key_max_lookups": os.getenv("FEEDBACK_RESOLUTION_NO_KEY_MAX_LOOKUPS"),
+            "feedback_resolution_time_budget_sec": os.getenv("FEEDBACK_RESOLUTION_TIME_BUDGET_SEC"),
+            "feedback_resolution_run_cache_enabled": os.getenv("FEEDBACK_RESOLUTION_RUN_CACHE_ENABLED"),
             # Source enablement
             "papers_enabled": os.getenv("PAPERS_ENABLED"),
+            "semantic_scholar_enabled": os.getenv("SEMANTIC_SCHOLAR_ENABLED"),
+            "semantic_scholar_api_key": os.getenv("SEMANTIC_SCHOLAR_API_KEY"),
+            "semantic_scholar_max_results": os.getenv("SEMANTIC_SCHOLAR_MAX_RESULTS"),
+            "semantic_scholar_seeds_path": os.getenv("SEMANTIC_SCHOLAR_SEEDS_PATH"),
+            "semantic_memory_enabled": os.getenv("SEMANTIC_MEMORY_ENABLED"),
+            "semantic_memory_path": os.getenv("SEMANTIC_MEMORY_PATH"),
+            "semantic_seen_ttl_days": os.getenv("SEMANTIC_SEEN_TTL_DAYS"),
+            "semantic_memory_max_ids": os.getenv("SEMANTIC_MEMORY_MAX_IDS"),
             # Blog settings from environment
             "blogs_enabled": os.getenv("BLOGS_ENABLED"),
             "blog_days_back": os.getenv("BLOG_DAYS_BACK"),
@@ -164,10 +202,27 @@ class Config:
         for key, value in env_overrides.items():
             if value is not None:
                 # Handle boolean conversion for source enablement
-                if key in ("blogs_enabled", "papers_enabled"):
+                if key in (
+                    "blogs_enabled",
+                    "papers_enabled",
+                    "semantic_scholar_enabled",
+                    "semantic_memory_enabled",
+                    "feedback_resolution_enabled",
+                    "feedback_resolution_run_cache_enabled",
+                ):
                     config_data[key] = value.lower() not in ("false", "0", "no", "off")
                 # Handle int conversion for blog_days_back
-                elif key == "blog_days_back":
+                elif key in (
+                    "blog_days_back",
+                    "semantic_scholar_max_results",
+                    "semantic_seen_ttl_days",
+                    "semantic_memory_max_ids",
+                    "feedback_token_ttl_days",
+                    "feedback_resolution_timeout_sec",
+                    "feedback_resolution_max_lookups",
+                    "feedback_resolution_no_key_max_lookups",
+                    "feedback_resolution_time_budget_sec",
+                ):
                     try:
                         config_data[key] = int(value)
                     except ValueError:
@@ -212,11 +267,27 @@ class Config:
             "papers_enabled": self.papers_enabled,
             "manual_source_enabled": self.manual_source_enabled,
             "manual_source_path": self.manual_source_path,
+            "semantic_scholar_enabled": self.semantic_scholar_enabled,
+            "semantic_scholar_max_results": self.semantic_scholar_max_results,
+            "semantic_scholar_seeds_path": self.semantic_scholar_seeds_path,
+            "semantic_memory_enabled": self.semantic_memory_enabled,
+            "semantic_memory_path": self.semantic_memory_path,
+            "semantic_seen_ttl_days": self.semantic_seen_ttl_days,
+            "semantic_memory_max_ids": self.semantic_memory_max_ids,
             # Blog settings
             "blogs_enabled": self.blogs_enabled,
             "blog_days_back": self.blog_days_back,
             "enabled_blogs": self.enabled_blogs,
             "custom_blogs": self.custom_blogs,
+            "feedback_endpoint_base_url": self.feedback_endpoint_base_url,
+            "feedback_token_ttl_days": self.feedback_token_ttl_days,
+            "feedback_reviewer": self.feedback_reviewer,
+            "feedback_resolution_enabled": self.feedback_resolution_enabled,
+            "feedback_resolution_timeout_sec": self.feedback_resolution_timeout_sec,
+            "feedback_resolution_max_lookups": self.feedback_resolution_max_lookups,
+            "feedback_resolution_no_key_max_lookups": self.feedback_resolution_no_key_max_lookups,
+            "feedback_resolution_time_budget_sec": self.feedback_resolution_time_budget_sec,
+            "feedback_resolution_run_cache_enabled": self.feedback_resolution_run_cache_enabled,
         }
         
         with open(path, "w") as f:

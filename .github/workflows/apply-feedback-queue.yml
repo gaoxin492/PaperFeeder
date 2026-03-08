@@ -1,0 +1,131 @@
+name: Apply Feedback Queue
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Optional run_id filter (empty = apply all pending)"
+        required: false
+        default: ""
+      manifest_file:
+        description: "Optional manifest file for run mapping (falls back to artifacts dir scan)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no seed write)"
+        required: false
+        default: "true"
+        type: boolean
+
+jobs:
+  apply-queue:
+    runs-on: ubuntu-latest
+    env:
+      SEED_STATE_BRANCH: ${{ vars.SEED_STATE_BRANCH }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Load seeds from state branch
+        run: |
+          STATE_BRANCH="${SEED_STATE_BRANCH:-memory-state}"
+          SEEDS_FILE="semantic_scholar_seeds.json"
+          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null 2>&1; then
+            git fetch --depth=1 origin "$STATE_BRANCH"
+            if git show "origin/$STATE_BRANCH:$SEEDS_FILE" > "$SEEDS_FILE" 2>/dev/null; then
+              echo "Loaded seeds from $STATE_BRANCH."
+            else
+              echo "Seeds file missing on $STATE_BRANCH, initializing empty."
+              cat > "$SEEDS_FILE" <<'EOF'
+          {
+            "positive_paper_ids": [],
+            "negative_paper_ids": []
+          }
+          EOF
+            fi
+          else
+            echo "Branch $STATE_BRANCH not found, initializing empty seeds."
+            cat > "$SEEDS_FILE" <<'EOF'
+          {
+            "positive_paper_ids": [],
+            "negative_paper_ids": []
+          }
+          EOF
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply queue to seeds
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+        run: |
+          MANIFEST="${{ github.event.inputs.manifest_file }}"
+          RUN_ID="${{ github.event.inputs.run_id }}"
+          DRY="${{ github.event.inputs.dry_run || 'true' }}"
+          BASE_CMD=(python semantic_feedback_apply.py --from-d1 --manifest-file "${MANIFEST}" --manifests-dir artifacts)
+          if [ -n "$RUN_ID" ]; then
+            BASE_CMD+=(--run-id "$RUN_ID")
+          fi
+          if [ "$DRY" = "true" ]; then
+            "${BASE_CMD[@]}" --dry-run
+          else
+            "${BASE_CMD[@]}"
+          fi
+
+      - name: Persist seeds to state branch (non-dry-run)
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATE_BRANCH="${SEED_STATE_BRANCH:-memory-state}"
+          SEEDS_FILE="semantic_scholar_seeds.json"
+          if [ ! -f "$SEEDS_FILE" ]; then
+            echo "No seeds file found, skipping."
+            exit 0
+          fi
+
+          TMP_DIR="$(mktemp -d)"
+          REMOTE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --depth 1 --branch "$STATE_BRANCH" "$REMOTE_URL" "$TMP_DIR/repo"
+          else
+            git clone --depth 1 "$REMOTE_URL" "$TMP_DIR/repo"
+            (
+              cd "$TMP_DIR/repo"
+              git checkout --orphan "$STATE_BRANCH"
+              git rm -rf . >/dev/null 2>&1 || true
+            )
+          fi
+
+          cp "$SEEDS_FILE" "$TMP_DIR/repo/$SEEDS_FILE"
+
+          (
+            cd "$TMP_DIR/repo"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$SEEDS_FILE"
+            if git diff --cached --quiet; then
+              echo "No seed changes to persist on $STATE_BRANCH."
+              exit 0
+            fi
+            git commit -m "chore: apply queued feedback to seeds [skip ci]"
+            git push origin "HEAD:$STATE_BRANCH"
+          )

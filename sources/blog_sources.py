@@ -262,17 +262,56 @@ class BlogSource(BaseSource):
         
         if not feed_url:
             return []
-        
+
+        # Browser-like headers improve reliability for some sites/CDNs.
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/122.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+        }
+
+        content = None
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                timeout = aiohttp.ClientTimeout(total=45, connect=15, sock_read=30)
+                async with aiohttp.ClientSession(timeout=timeout, trust_env=True, headers=headers) as session:
+                    async with session.get(feed_url) as response:
+                        if response.status == 404:
+                            print(f"   ⚠️ {name}: HTTP 404")
+                            return []
+                        if response.status >= 500:
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(1.5)
+                                continue
+                            print(f"   ⚠️ {name}: HTTP {response.status}")
+                            return []
+                        if response.status != 200:
+                            print(f"   ⚠️ {name}: HTTP {response.status}")
+                            return []
+                        content = await response.text()
+                        break
+            except asyncio.TimeoutError:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1.5)
+                    continue
+                print(f"   ⚠️ {name}: Timeout")
+                return []
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1.0)
+                    continue
+                print(f"   ⚠️ {name}: {type(e).__name__}: {str(e)[:50]}")
+                return []
+
+        if content is None:
+            print(f"   ⚠️ {name}: Failed after retries")
+            return []
+
         try:
-            # Fetch feed content
-            timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(feed_url) as response:
-                    if response.status != 200:
-                        print(f"   ⚠️ {name}: HTTP {response.status}")
-                        return []
-                    
-                    content = await response.text()
             
             # Parse feed
             feed = feedparser.parse(content)
@@ -340,9 +379,6 @@ class BlogSource(BaseSource):
             
             return posts
             
-        except asyncio.TimeoutError:
-            print(f"   ⚠️ {name}: Timeout")
-            return []
         except Exception as e:
             print(f"   ⚠️ {name}: {type(e).__name__}: {str(e)[:50]}")
             return []
@@ -372,7 +408,7 @@ class JinaReaderSource(BaseSource):
                 jina_url = f"{self.JINA_API}/{url}"
                 
                 timeout = aiohttp.ClientTimeout(total=60)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                     async with session.get(jina_url) as response:
                         if response.status != 200:
                             print(f"   ⚠️ Jina Reader failed for {url}: HTTP {response.status}")

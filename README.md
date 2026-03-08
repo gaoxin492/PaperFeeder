@@ -8,6 +8,11 @@ An intelligent content recommendation system that automatically fetches, filters
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+📌 **Recent updates:**
+- Semantic Scholar personalization is now production-ready (seed profile + anti-repetition memory + web feedback loop).
+- Feedback flow is now digest-notification + web viewer actions (manual apply gate preserved).
+- Full changelog: [UPDATE.md](UPDATE.md)
+
 ---
 
 ## ✨ Key Features
@@ -33,7 +38,7 @@ Fetch Papers → Fetch Blogs → Keyword Filter → LLM Coarse Filter → Resear
 
 ### 🎯 **Two-Stage LLM Filtering**
 - **Stage 1 (Coarse)**: Fast screening based on title + abstract → Top 20
-- **Stage 2 (Fine)**: Deep ranking with community signals → Top 3-5
+- **Stage 2 (Fine)**: Deep ranking with community signals → Top 1-5
 
 ### 📰 **"Editor's Choice" Style Reports**
 - Senior Principal Researcher persona (OpenAI/DeepMind/Anthropic caliber)
@@ -44,6 +49,11 @@ Fetch Papers → Fetch Blogs → Keyword Filter → LLM Coarse Filter → Resear
 - Supports any OpenAI-compatible LLM (OpenAI, Claude, Gemini, DeepSeek, Qwen, local models)
 - PDF multimodal input for deep analysis (Claude, Gemini)
 - Customizable research interests and filtering criteria
+
+### 🧠 **Semantic Scholar Personalization**
+- Seed-based recommendations (`positive_paper_ids` / `negative_paper_ids`)
+- Anti-repetition memory (`semantic_scholar_memory.json`) with TTL
+- Human preference loop via web viewer (`positive` / `negative` / `undecided-reset`) + manual apply
 
 ---
 
@@ -125,6 +135,91 @@ Use **GitHub Actions** for **FREE** automated deployment (no server needed):
 **👉 See [DEPLOY.md](DEPLOY.md) for complete setup guide** (takes ~5 minutes)
 
 ✨ **Recommended**: Start with `--dry-run` locally to test your configuration, then deploy to GitHub Actions for daily automation!
+
+---
+
+## 🧠 Semantic Scholar Personalization
+
+This is the main personalization feature in PaperFeeder:
+- seed profile controls recommendation direction
+- memory avoids repeated recommendations
+- web feedback updates preferences (via manual apply)
+
+### 1) Seed + Memory Setup
+
+Configure `config.yaml`:
+
+```yaml
+semantic_scholar_enabled: true
+semantic_scholar_max_results: 30
+semantic_scholar_seeds_path: "semantic_scholar_seeds.json"
+semantic_memory_enabled: true
+semantic_memory_path: "semantic_scholar_memory.json"
+semantic_seen_ttl_days: 30
+semantic_memory_max_ids: 5000
+```
+
+Create `semantic_scholar_seeds.json`:
+
+```json
+{
+  "positive_paper_ids": ["CorpusId:282913080", "CorpusId:270562552"],
+  "negative_paper_ids": ["CorpusId:283933653"]
+}
+```
+
+Notes:
+- Numeric IDs are auto-normalized to `CorpusId:<id>`.
+- `positive_paper_ids` = "more like this", `negative_paper_ids` = "avoid this direction".
+
+### 2) Preference Feedback Flow (Current)
+
+1. Run `Daily Paper Digest`.
+2. Open digest email.
+3. Click run-level web viewer link.
+4. Click `positive` / `negative` / `undecided` in viewer.
+5. Run `Apply Feedback Queue`:
+   - `dry_run=true` first
+   - then `dry_run=false` to persist seeds.
+
+Notes:
+- During digest export, report-visible ArXiv/HuggingFace papers now use best-effort Semantic Scholar ID resolution (existing ID -> arXiv mapping -> conservative title match).
+- If resolution fails (rate limit/network/budget), papers remain visible but non-actionable (no per-paper action links).
+- Seed updates still require the apply step; clicking feedback alone does not persist seed changes until apply runs.
+
+Required keys (GitHub Secrets / `.env`):
+
+```bash
+FEEDBACK_ENDPOINT_BASE_URL=https://paperfeeder-feedback.<subdomain>.workers.dev
+FEEDBACK_LINK_SIGNING_SECRET=<shared-secret>
+FEEDBACK_TOKEN_TTL_DAYS=7
+FEEDBACK_REVIEWER=<optional reviewer override>
+
+CLOUDFLARE_ACCOUNT_ID=<account-id>
+CLOUDFLARE_API_TOKEN=<api-token>
+D1_DATABASE_ID=<database-id>
+```
+
+Feedback semantics:
+- `positive`: add to positive seeds and remove from negative.
+- `negative`: add to negative seeds and remove from positive.
+- `undecided`: reset state by removing from both seed lists.
+
+### 3) State Branch Model (Recommended)
+
+- Default: if `SEED_STATE_BRANCH` is unset, workflows use `memory-state`.
+- Seeds + memory are loaded from state branch before run.
+- Apply writes seeds back to state branch.
+- Digest writes memory back to state branch.
+
+### 4) What You Actually Need Daily
+
+- Needed daily: `Daily Paper Digest` + `Apply Feedback Queue` workflows.
+- Optional/local debug: `scripts/apply_semantic_feedback_queue.sh`.
+
+Details:
+- Personalization operations: [PERSONALIZATION_AND_MEMORY.md](docs/PERSONALIZATION_AND_MEMORY.md)
+- Cloudflare + D1 manual setup: [FEEDBACK_INFRA_SETUP.md](docs/FEEDBACK_INFRA_SETUP.md)
 
 ---
 
@@ -433,6 +528,64 @@ Or just add URLs (metadata auto-fetched):
 }
 ```
 
+### Operational Notes (Dedup + Memory + Daily Ops)
+
+#### Dedup behavior (important)
+
+- Paper fetch dedup key is `arxiv_id` first, else `url` (cross-source paper dedup at fetch stage).
+- Paper dedup is **not** title-based by default.
+- Blog dedup before report is by exact `url`.
+- Report sections are generated by LLM. If the model repeats one paper in multiple sections (for example Editor's Choice and Deep Dive), this is currently allowed unless post-processing is added.
+
+#### Semantic memory behavior
+
+- Memory file: `semantic_scholar_memory.json`.
+- Memory uses unified cross-source keys:
+  - `arxiv:<id>` (canonical when available)
+  - `semantic:<id>` plus legacy raw semantic id (migration compatibility)
+  - `hf:<normalized-url>` fallback when no arXiv id exists
+- Suppression applies across Semantic Scholar, arXiv, and HuggingFace.
+- Only final papers that are actually present as links in rendered report HTML are marked as `seen`.
+- Seen suppression window is controlled by `semantic_seen_ttl_days`.
+- Memory size is capped by `semantic_memory_max_ids` (oldest entries are pruned).
+
+#### GitHub Actions memory persistence model
+
+- Workflow loads memory from `memory-state` branch before running pipeline.
+- Workflow writes updated memory back to `memory-state` branch after run.
+- Main code branch remains focused on code/config changes; memory churn is isolated.
+
+#### Local + remote workflow tips
+
+- Local dry-run will update local `semantic_scholar_memory.json`.
+- Committing local memory is acceptable in this project (state file), but rebase/pull before push is still recommended if Actions updated remote state recently.
+- `openspec/` artifacts are local workflow files (gitignored in this repo by default), so planning/spec drafts do not pollute normal code history unless you intentionally track them.
+- Safe order for day-to-day changes:
+  1. code change
+  2. `git add` + `git commit`
+  3. `git pull --rebase origin main`
+  4. resolve conflicts if any
+  5. `git push`
+
+#### Manual action inputs (`days_back`)
+
+- In GitHub Actions, open `Daily Paper Digest` -> `Run workflow`.
+- `days_back` controls how many days of papers are fetched (`--days` in CLI).
+- `dry_run=true` generates preview artifact (`paper-report`) without sending email.
+- Feedback files are uploaded as `feedback-artifacts-<run_id>.zip` for each run.
+
+#### Troubleshooting
+
+- `LLM filter: Could not parse response (batch offset X)`:
+  - Cause: model returned non-JSON/empty/invalid batch output.
+  - Debug artifacts are saved in `llm_filter_debug/` with prompt + raw response.
+  - Try a more stable filter model/base URL, then rerun.
+- "Total papers" in report can look larger than unique visible picks:
+  - Count may refer to upstream candidate pool while rendered sections show only selected subsets.
+- Repeated paper/blog in multiple report sections:
+  - Usually caused by LLM output structure, not source fetch dedup.
+  - Add post-generation section-level dedup if strict uniqueness is required.
+
 ### Disable Features
 
 ```bash
@@ -451,7 +604,8 @@ python main.py --dry-run
 Contributions welcome! Areas for improvement:
 
 - [x] ~~Blog source integration~~ ✅ Done!
-- [ ] Additional paper sources (Semantic Scholar, OpenReview)
+- [x] Additional paper sources (Semantic Scholar) ✅ Done
+- [ ] Additional paper sources (OpenReview)
 - [ ] More research enrichment signals (citation counts, author h-index)
 - [ ] Multi-language support
 - [ ] Web UI / Chatbot integration
