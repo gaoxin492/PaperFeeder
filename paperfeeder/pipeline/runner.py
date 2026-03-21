@@ -268,7 +268,11 @@ async def filter_papers_fine(papers: List[Paper], config: Config) -> List[Paper]
     return final_papers
 
 
-async def summarize_papers(papers: list[Paper], config: Config, priority_blogs: list[Paper] | None = None) -> str:
+async def summarize_papers(
+    papers: list[Paper],
+    config: Config,
+    priority_blogs: list[Paper] | None = None,
+) -> str:
     from paperfeeder.pipeline.summarizer import PaperSummarizer
 
     all_content = []

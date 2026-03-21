@@ -133,6 +133,36 @@ Key files:
 | Semantic Scholar API | Strongly recommended | better ID resolution for personalization and feedback links |
 | Cloudflare Worker + D1 | Optional | one-click remote feedback loop |
 
+### Cost Profile
+
+PaperFeeder is intentionally designed so costs stay controllable.
+
+The main reason is architectural separation:
+
+1. coarse and fine filtering can run on a cheap model such as DeepSeek
+2. only the final digest writing step needs a stronger model such as Claude, Gemini, or GPT APIs
+3. the expensive model sees only the shortlisted set rather than the full firehose
+4. PDF-aware synthesis is optional and bounded by page limits, so it does not scale linearly with the raw candidate pool
+
+In practice, this means the cheap filtering stage usually costs very little, and the dominant cost is the final synthesis pass on a much smaller set of papers and blog posts.
+
+Rough LLM-only monthly cost, assuming 1 run per day, about 40 to 60 raw items per day, about 15 to 25 items reaching LLM filtering, about 6 to 10 shortlisted items, and PDF reading capped to the first 10 to 15 pages:
+
+| Setup | Example routing | Rough monthly cost |
+|------|------------------|-------------------|
+| Budget | DeepSeek for filtering + Gemini Flash or another low-cost synthesis model | about $2 to $8 / month |
+| Balanced | DeepSeek for filtering + Claude Sonnet / Gemini Pro / GPT-class synthesis | about $8 to $25 / month |
+| Heavy | premium synthesis every day with more PDFs and a larger shortlist | about $20 to $50 / month |
+
+These numbers are only order-of-magnitude estimates, not a pricing guarantee. Actual spend depends mostly on:
+
+1. how many items survive keyword filtering
+2. whether PDF-aware synthesis is enabled
+3. which synthesis model you choose for the final digest
+4. how often you run the pipeline
+
+In small-team or solo-research usage, the system is generally cheap enough that model choice becomes a quality decision rather than an infrastructure problem. Optional Tavily, email, and Cloudflare costs are separate and usually modest at low volume.
+
 ### Local Setup
 
 ```bash

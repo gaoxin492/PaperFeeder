@@ -132,6 +132,36 @@ PaperFeeder/
 | Semantic Scholar API | 强烈推荐 | 改善 semantic ID 解析和 feedback 按钮可用率 |
 | Cloudflare Worker + D1 | 可选 | 开启 one-click feedback 闭环 |
 
+### 成本轮廓
+
+PaperFeeder 的一条设计原则就是：成本要可控，而不是把所有步骤都堆到同一个贵模型上。
+
+核心原因是它把不同阶段拆开了：
+
+1. coarse / fine filter 可以用很便宜的模型，例如 DeepSeek
+2. 最终 digest 的理解、判断和写作，再交给更强的 Claude、Gemini 或 GPT API
+3. 贵模型处理的是 shortlist，而不是整条高噪声信息流
+4. PDF 感知摘要也是可选项，而且有页数上限，不会随原始候选数线性暴涨
+
+实际运行里，便宜的是筛选，真正占大头的是最后那一步 synthesis；而那一步面对的是已经缩小过的一小组内容，所以整体花销通常不高。
+
+一个很粗略的 LLM 月度成本估算，可以按下面这个量级理解：假设每天跑 1 次，每天原始候选大约 40 到 60 条，进入 LLM filter 的大约 15 到 25 条，最终 shortlist 大约 6 到 10 条，PDF 阅读限制在前 10 到 15 页。
+
+| 档位 | 典型模型分工 | 粗略月成本 |
+|------|--------------|-----------|
+| 预算档 | DeepSeek 做筛选 + Gemini Flash 或其他低价模型做最终 digest | 约 $2 到 $8 / 月 |
+| 平衡档 | DeepSeek 做筛选 + Claude Sonnet / Gemini Pro / GPT 级模型做最终 digest | 约 $8 到 $25 / 月 |
+| 重度档 | 每天都用较贵模型做 synthesis，且 PDF 更多、shortlist 更长 | 约 $20 到 $50 / 月 |
+
+这只是数量级粗估，不是精确报价。真实花销主要取决于：
+
+1. 有多少内容能通过关键词过滤进入 LLM 阶段
+2. 是否开启 PDF-aware synthesis
+3. 最终 digest 选用什么模型
+4. 运行频率是多少
+
+对个人研究者或小团队来说，这套系统通常便宜到足以把“模型选型”当成质量选择，而不是基础设施负担。Tavily、邮件服务和 Cloudflare 这类可选组件的费用是分开的，在低频使用下通常也不高。
+
 ### 本地配置步骤
 
 ```bash

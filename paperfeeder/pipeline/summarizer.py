@@ -291,47 +291,54 @@ Critical requirements:
                 line-height: 1.7;
                 color: #1e293b;
                 background: linear-gradient(180deg, #edf5fd 0%, #eff6ff 48%, #e2e8f0 100%);
-                padding: 18px 14px 24px;
+                padding: 10px 2px 14px;
                 padding:
-                    max(18px, calc(18px + env(safe-area-inset-top)))
-                    max(14px, calc(14px + env(safe-area-inset-right)))
-                    max(24px, calc(24px + env(safe-area-inset-bottom)))
-                    max(14px, calc(14px + env(safe-area-inset-left)));
+                    max(10px, calc(10px + env(safe-area-inset-top)))
+                    max(2px, calc(2px + env(safe-area-inset-right)))
+                    max(14px, calc(14px + env(safe-area-inset-bottom)))
+                    max(2px, calc(2px + env(safe-area-inset-left)));
                 font-size: clamp(15px, 2.8vw, 16px);
             }}
             .container {{
                 max-width: min(48rem, 100%);
                 margin: 0 auto;
-                background: #fff;
-                border-radius: 26px;
-                box-shadow: 0 12px 36px rgba(30, 41, 59, 0.10);
-                border: 1px solid rgba(191, 219, 254, 0.9);
+                background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+                border-radius: 24px;
+                box-shadow: 0 12px 32px rgba(37, 99, 235, 0.08);
+                border: 1px solid rgba(191, 219, 254, 0.95);
                 overflow: hidden;
             }}
             .header {{
-                background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
+                background: linear-gradient(135deg, #eaf6ff 0%, #dff1ff 55%, #dbeafe 100%);
                 color: #0c4a6e;
-                padding: 18px 20px 16px;
+                padding: 14px 8px 12px;
                 text-align: center;
                 border-bottom: 1px solid rgba(125, 211, 252, 0.65);
             }}
-            .header h1 {{ font-size: 1.95rem; font-weight: 800; letter-spacing: -0.03em; color: #0b6ea8; }}
+            .header h1 {{ font-size: 1.95rem; font-weight: 800; letter-spacing: -0.03em; color: #0a6aa1; text-shadow: 0 1px 0 rgba(255,255,255,0.55); }}
             .header .meta {{ margin-top: 10px; font-size: 0.98rem; font-weight: 500; color: #0e7490; line-height: 1.55; }}
             .header .persona {{ margin-top: 10px; font-size: 0.82rem; color: #64748b; line-height: 1.5; }}
             .content {{
-                padding: 18px 16px 24px;
+                padding: 12px 4px 16px;
                 color: #1e293b;
             }}
             .content > * + * {{ margin-top: 18px; }}
-            .content section + section {{ margin-top: 24px; }}
+            .content section {{
+                background: #ffffff;
+                border: 1px solid #dbeafe;
+                border-radius: 18px;
+                padding: 14px 12px;
+                box-shadow: 0 4px 14px rgba(148, 163, 184, 0.08);
+            }}
+            .content section + section {{ margin-top: 18px; }}
             .content h2 {{
                 color: #1e293b;
                 font-size: 1.1rem;
                 font-weight: 800;
                 line-height: 1.3;
-                margin: 30px 0 18px;
-                padding: 0 0 12px;
-                border-bottom: 4px solid #3b82f6;
+                margin: 24px 0 14px;
+                padding: 0 0 10px;
+                border-bottom: 3px solid #60a5fa;
             }}
             .content h2:first-child {{ margin-top: 0; }}
             .content h3 {{
@@ -339,9 +346,9 @@ Critical requirements:
                 font-size: 1rem;
                 font-weight: 800;
                 line-height: 1.4;
-                margin: 20px 0 12px;
+                margin: 16px 0 10px;
             }}
-            .content p {{ margin: 0 0 14px; color: #475569; }}
+            .content p {{ margin: 0 0 12px; color: #475569; }}
             .content ul, .content ol {{ margin: 0 0 16px 1.35em; color: #334155; }}
             .content li + li {{ margin-top: 10px; }}
             .content strong {{ color: #1e293b; }}
@@ -349,24 +356,25 @@ Critical requirements:
             .content blockquote {{
                 margin: 18px 0;
                 padding: 16px 18px;
-                background: #eff6ff;
-                border: 1px solid #dbeafe;
+                background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+                border: 1px solid #cfe3ff;
                 border-radius: 16px;
             }}
-            .footer {{ text-align: center; padding: 12px 16px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #e2e8f0; background: #f8fafc; }}
+            .footer {{ text-align: center; padding: 12px 16px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff 0%, #f8fafc 100%); }}
             @media (max-width: 640px) {{
                 body {{
-                    padding: 12px 10px 18px;
+                    padding: 8px 1px 12px;
                     padding:
-                        max(12px, calc(12px + env(safe-area-inset-top)))
-                        max(10px, calc(10px + env(safe-area-inset-right)))
-                        max(18px, calc(18px + env(safe-area-inset-bottom)))
-                        max(10px, calc(10px + env(safe-area-inset-left)));
+                        max(8px, calc(8px + env(safe-area-inset-top)))
+                        max(1px, calc(1px + env(safe-area-inset-right)))
+                        max(12px, calc(12px + env(safe-area-inset-bottom)))
+                        max(1px, calc(1px + env(safe-area-inset-left)));
                 }}
-                .container {{ border-radius: 22px; }}
-                .header {{ padding: 16px 16px 14px; }}
+                .container {{ border-radius: 20px; }}
+                .header {{ padding: 12px 6px 10px; }}
                 .header h1 {{ font-size: 1.75rem; }}
-                .content {{ padding: 16px 14px 20px; }}
+                .content {{ padding: 10px 3px 14px; }}
+                .content section {{ padding: 12px 10px; border-radius: 16px; }}
                 .content h2 {{ font-size: 0.98rem; margin: 26px 0 16px; }}
             }}
         </style>

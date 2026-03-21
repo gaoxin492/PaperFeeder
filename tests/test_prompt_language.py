@@ -18,6 +18,10 @@ class PromptLanguageTests(unittest.TestCase):
         prompts = summarizer._build_prompt([], blog_posts=[])
         self.assertIn("## My Research Interests", prompts["user"])
         self.assertIn("Write primarily in English.", prompts["user"])
+        self.assertIn("Use a stable 4-section report structure in this order", prompts["user"])
+        self.assertIn("Worth Knowing, Not Main Picks", prompts["user"])
+        self.assertIn("every remaining paper in today's paper pool", prompts["user"])
+        self.assertIn("Judgment Summary", prompts["user"])
         self.assertIn("Do not include any skipped/rejected/not-selected section", prompts["user"])
         self.assertIn("one compact overview paragraph plus 3 short bullets", prompts["user"])
         self.assertIn("Do not output raw markdown separators like ---.", prompts["user"])
@@ -32,6 +36,10 @@ class PromptLanguageTests(unittest.TestCase):
         prompts = summarizer._build_prompt([], blog_posts=[])
         self.assertIn("## 我的研究兴趣", prompts["user"])
         self.assertIn("输出语言以简体中文为主", prompts["user"])
+        self.assertIn("最终报告优先使用固定的 4 个一级 section", prompts["user"])
+        self.assertIn("值得知道但暂不主推", prompts["user"])
+        self.assertIn("剩下没有展开深读的论文", prompts["user"])
+        self.assertIn("今日判断摘要", prompts["user"])
         self.assertIn("不要在最终报告里写任何\"跳过/未入选/skip\"区块", prompts["user"])
         self.assertIn("1 段简洁概述 + 3 个短要点", prompts["user"])
         self.assertIn("不要输出裸露的 markdown 分隔线", prompts["user"])
@@ -65,7 +73,6 @@ class PromptLanguageTests(unittest.TestCase):
         content = '<p><span class="badge">RL · 文本反馈</span><a href="https://example.com">Example Title</a></p>'
         cleaned = summarizer._split_badge_and_title_lines(content)
         self.assertIn("</span><br><a ", cleaned)
-
 
 if __name__ == "__main__":
     unittest.main()

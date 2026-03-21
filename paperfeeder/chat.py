@@ -4,6 +4,7 @@ OpenAI-compatible chat client (remote APIs, local endpoints, Anthropic, etc.).
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from pathlib import Path
 from typing import List, Optional
@@ -19,6 +20,13 @@ class LLMClient:
     """
 
     PDF_NATIVE_MODELS = ["claude", "gemini"]
+    PDF_DOWNLOAD_RETRIES = 3
+    PDF_DOWNLOAD_CHUNK_SIZE = 64 * 1024
+    PDF_DOWNLOAD_TIMEOUT = aiohttp.ClientTimeout(total=180, connect=30, sock_read=120)
+    PDF_REQUEST_HEADERS = {
+        "User-Agent": "PaperFeeder/1.0 (+https://github.com/paperfeeder)",
+        "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.1",
+    }
 
     def __init__(
         self,
@@ -284,51 +292,107 @@ class LLMClient:
         debug_dir: str = "debug_pdfs",
         max_pages: int = 10,
     ) -> Optional[str]:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
-                    if response.status != 200:
-                        print(f"      PDF download failed: HTTP {response.status}")
-                        return None
-                    content = await response.read()
-                    if not content.startswith(b"%PDF"):
-                        print("      Downloaded content is not a valid PDF")
-                        return None
-                    if max_pages > 0:
-                        try:
-                            import fitz
+        preview = str(url)[:50] if url is not None else "<none>"
+        last_error: Exception | None = None
 
-                            doc = fitz.open(stream=content, filetype="pdf")
-                            total_pages = len(doc)
-                            if total_pages > max_pages:
-                                new_doc = fitz.open()
-                                new_doc.insert_pdf(doc, from_page=0, to_page=max_pages - 1)
-                                content = new_doc.tobytes()
-                                new_doc.close()
-                                print(f"      Extracted first {max_pages} pages (total: {total_pages})")
-                            else:
-                                print(f"      PDF has {total_pages} pages (using all)")
-                            doc.close()
-                        except ImportError:
-                            print("      PyMuPDF not available, using full PDF")
-                        except Exception as exc:
-                            print(f"      Failed to extract pages: {exc}, using full PDF")
-                    if save_debug:
-                        Path(debug_dir).mkdir(parents=True, exist_ok=True)
-                        filename = url.split("/")[-1].split("?")[0] or "paper.pdf"
-                        if not filename.endswith(".pdf"):
-                            filename += ".pdf"
-                        filepath = Path(debug_dir) / filename
-                        with open(filepath, "wb") as handle:
-                            handle.write(content)
-                        print(f"      Debug PDF saved to {filepath} ({len(content)} bytes)")
-                    pdf_base64 = base64.standard_b64encode(content).decode("utf-8")
-                    print(f"      PDF processed: {len(content)} bytes -> base64 length: {len(pdf_base64)}")
-                    return pdf_base64
-        except Exception as exc:
-            preview = str(url)[:50] if url is not None else "<none>"
-            print(f"      PDF download failed for {preview}...: {exc}")
-            return None
+        for attempt in range(1, self.PDF_DOWNLOAD_RETRIES + 1):
+            try:
+                content = await self._download_pdf_bytes_async(url)
+                if not content.startswith(b"%PDF"):
+                    print("      Downloaded content is not a valid PDF")
+                    return None
+
+                if max_pages > 0:
+                    try:
+                        import fitz
+
+                        doc = fitz.open(stream=content, filetype="pdf")
+                        total_pages = len(doc)
+                        if total_pages > max_pages:
+                            new_doc = fitz.open()
+                            new_doc.insert_pdf(doc, from_page=0, to_page=max_pages - 1)
+                            content = new_doc.tobytes()
+                            new_doc.close()
+                            print(f"      Extracted first {max_pages} pages (total: {total_pages})")
+                        else:
+                            print(f"      PDF has {total_pages} pages (using all)")
+                        doc.close()
+                    except ImportError:
+                        print("      PyMuPDF not available, using full PDF")
+                    except Exception as exc:
+                        print(f"      Failed to extract pages: {exc}, using full PDF")
+
+                if save_debug:
+                    Path(debug_dir).mkdir(parents=True, exist_ok=True)
+                    filename = url.split("/")[-1].split("?")[0] or "paper.pdf"
+                    if not filename.endswith(".pdf"):
+                        filename += ".pdf"
+                    filepath = Path(debug_dir) / filename
+                    with open(filepath, "wb") as handle:
+                        handle.write(content)
+                    print(f"      Debug PDF saved to {filepath} ({len(content)} bytes)")
+
+                pdf_base64 = base64.standard_b64encode(content).decode("utf-8")
+                print(f"      PDF processed: {len(content)} bytes -> base64 length: {len(pdf_base64)}")
+                return pdf_base64
+            except Exception as exc:
+                last_error = exc
+                if attempt >= self.PDF_DOWNLOAD_RETRIES or not self._should_retry_pdf_download(exc):
+                    break
+                retry_delay = min(float(attempt), 3.0)
+                error_text = self._format_pdf_download_error(exc)
+                print(
+                    f"      PDF download attempt {attempt}/{self.PDF_DOWNLOAD_RETRIES} failed: {error_text}. "
+                    f"Retrying in {retry_delay:.0f}s..."
+                )
+                await asyncio.sleep(retry_delay)
+
+        print(f"      PDF download failed for {preview}...: {self._format_pdf_download_error(last_error)}")
+        return None
+
+    async def _download_pdf_bytes_async(self, url: str) -> bytes:
+        async with aiohttp.ClientSession(
+            timeout=self.PDF_DOWNLOAD_TIMEOUT,
+            trust_env=True,
+            headers=self.PDF_REQUEST_HEADERS,
+        ) as session:
+            async with session.get(url, timeout=self.PDF_DOWNLOAD_TIMEOUT, allow_redirects=True) as response:
+                if response.status == 200:
+                    chunks = []
+                    async for chunk in response.content.iter_chunked(self.PDF_DOWNLOAD_CHUNK_SIZE):
+                        if chunk:
+                            chunks.append(chunk)
+                    return b"".join(chunks)
+
+                if response.status in {429, 500, 502, 503, 504}:
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"temporary HTTP {response.status}",
+                        headers=response.headers,
+                    )
+
+                raise RuntimeError(f"HTTP {response.status}")
+
+    @staticmethod
+    def _should_retry_pdf_download(exc: Exception) -> bool:
+        if isinstance(exc, (asyncio.TimeoutError, ConnectionResetError, aiohttp.ClientPayloadError)):
+            return True
+        if isinstance(exc, aiohttp.ClientResponseError):
+            return exc.status in {429, 500, 502, 503, 504}
+        if isinstance(exc, aiohttp.ClientConnectionError):
+            return True
+        return False
+
+    @staticmethod
+    def _format_pdf_download_error(exc: Exception | None) -> str:
+        if exc is None:
+            return "unknown error"
+        try:
+            return str(exc)
+        except Exception:
+            return f"{type(exc).__name__}()"
 
     def _extract_pdf_text_from_base64(self, pdf_base64: str) -> str:
         try:
