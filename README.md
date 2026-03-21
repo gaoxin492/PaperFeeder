@@ -53,6 +53,8 @@ source .venv/bin/activate
 
 Then fill in `.env`, edit `config.yaml` for toggles and paths, edit `user/blogs.yaml` for blog sources, and edit files under `user/` for research preferences. The common user files are `user/blogs.yaml`, `user/research_interests.txt`, `user/keywords.txt`, `user/exclude_keywords.txt`, `user/arxiv_categories.txt`, and `user/prompt_addon.txt`.
 
+That local `.env` is mainly for local development and local testing. For GitHub Actions deployments, use GitHub Secrets and Variables instead; the workflows should not depend on a repository `.env` file.
+
 If you want the generated report prompt to be English-first instead of Chinese-first, set `prompt_language` in `config.yaml` to `en-US`.
 
 If you want a different starting point, look at the preset profiles under `user/examples/profiles/` and either copy the files you want into `user/`, or point `config.yaml` at a preset path.
@@ -239,7 +241,7 @@ There are two key workflows:
 
 By default it:
 
-1. runs every day at `03:00 UTC`
+1. runs every day at `00:01 UTC`, which is `08:01` China Standard Time
 2. loads `state/semantic/memory.json` and `state/semantic/seeds.json` from the state branch
 3. runs `python main.py`
 4. pushes updated `memory.json` back to the state branch
@@ -250,7 +252,7 @@ This workflow is what makes remote daily email delivery work.
 
 By default it:
 
-1. runs every 3 days at `03:30 UTC` with `30 3 */3 * *`
+1. runs every 3 days at `16:30 UTC` with `30 16 */3 * *`, which is `00:30` China Standard Time on the next day
 2. loads `seeds.json` from the state branch
 3. reads pending feedback from D1
 4. runs `python -m paperfeeder.cli.apply_feedback --from-d1`
@@ -285,6 +287,8 @@ If your goal is “run remotely and send every day”, follow this order.
 3. enable GitHub Actions
 
 #### 2. Add required GitHub Secrets
+
+Use this mental model: local runs read `.env`; GitHub Actions runs read GitHub Secrets and Variables. Keep those two paths separate and do not commit your local `.env`.
 
 At minimum, set these in `Settings -> Secrets and variables -> Actions -> Secrets`:
 
@@ -332,8 +336,8 @@ The first non-dry-run execution will also initialize the state branch if needed.
 
 Current defaults:
 
-1. `daily-digest.yml`: `0 3 * * *`
-2. `apply-feedback-queue.yml`: `30 3 */3 * *`
+1. `daily-digest.yml`: `1 0 * * *`
+2. `apply-feedback-queue.yml`: `30 16 */3 * *`
 
 Both are UTC. Change the cron expressions if you want a different time zone or cadence.
 
@@ -345,8 +349,8 @@ Use this approach when customizing the schedule:
 
 Examples:
 
-1. If you are in China Standard Time (`UTC+8`) and want `daily-digest.yml` at 09:00 local time, use `0 1 * * *`
-2. If you want `apply-feedback-queue.yml` every 3 days at 11:30 China time, use `30 3 */3 * *`
+1. If you are in China Standard Time (`UTC+8`) and want `daily-digest.yml` at 08:01 local time, use `1 0 * * *`
+2. If you want `apply-feedback-queue.yml` every 3 days at 00:30 China time, use `30 16 */3 * *`
 
 One important limitation: GitHub Actions cron is based on UTC calendar time, not a strict “every 72 hours” timer. A pattern like `*/3` means “every 3rd day of the month”, so the cadence resets at month boundaries. That is usually fine here. If you need an exact 72-hour interval, run the workflow daily and gate execution inside the script instead.
 

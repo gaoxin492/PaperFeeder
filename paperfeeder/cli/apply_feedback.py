@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - import-time fallback for lightweight environments
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 from paperfeeder.semantic import (
     apply_feedback_d1_to_seeds,
@@ -12,7 +19,16 @@ from paperfeeder.semantic import (
 )
 
 
+def load_cli_env() -> bool:
+    """Load local .env so standalone CLI commands behave like the main pipeline."""
+    env_path = Path.cwd() / ".env"
+    if env_path.exists():
+        return bool(load_dotenv(dotenv_path=env_path))
+    return False
+
+
 def main() -> int:
+    load_cli_env()
     parser = argparse.ArgumentParser(description="Apply reviewed semantic feedback into seed IDs.")
     parser.add_argument("--feedback-file", default="semantic_feedback.json", help="Path to feedback JSON file")
     parser.add_argument("--manifest-file", required=True, help="Path to run feedback manifest JSON file")

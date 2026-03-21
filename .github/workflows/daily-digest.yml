@@ -4,9 +4,9 @@ permissions:
   contents: write
 
 on:
-  # Run daily at 03:00 UTC (11:00 China time)
+  # Run daily at 00:01 UTC (08:01 China time)
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '1 0 * * *'
   
   # Allow manual trigger
   workflow_dispatch:

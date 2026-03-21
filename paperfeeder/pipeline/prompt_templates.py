@@ -52,6 +52,9 @@ ZH_CN_PACK = SummaryLanguagePack(
         "宁缺毋滥。",
         "具体、可执行。",
         "深度分析要有干货。",
+        "不要在最终报告里写任何\"跳过/未入选/skip\"区块，不要列出被你排除的论文数量、标题或理由；最终报告只写你真正推荐读的内容。",
+        "对每个入选条目，不要只写空泛短评；至少覆盖：一句话判断、核心方法/观点、为什么重要、关键局限或风险、你建议读者重点关注什么。",
+        "单篇分析要比现在更完整，但仍要克制篇幅：以 1 段简洁概述 + 3 个短要点为宜，避免只有一两句，也避免写成长篇综述。",
         "视觉：必须浅色清爽。正文区块背景只用 #ffffff 或 #f8fafc；文字用深色 #1e293b / #334155。禁止黑底/深灰底配浅色字、禁止整段深色卡片风格；链接用蓝色即可。",
         "每个条目请保留可点击的论文/博客原始 URL（与上方列表中的 URL 一致），用 <a href=\"...\"> 输出，便于反馈按钮匹配。",
         "版式宽度：不要在外层再包 <div style=\"max-width:...\">、居中窄栏或多层大 padding/margin；宿主页面已有 .content 与整页宽度约束。请用 <h2>、<p>、<section> 等平铺，避免大边距套小边距把正文挤成细条。",
@@ -76,6 +79,8 @@ For each paper AND blog post, you instinctively assess:
 - 犀利、专业、不废话
 - 以简体中文为主，必要时保留英文术语
 - 直接给判断，不要模棱两可
+- 最终只呈现值得读的内容，不要写 skipped / rejected 列表
+- 单篇分析要扎实，不能只有泛泛两三句话
 
 ## CRITICAL: Blog Post Filtering
 - NOT all blog posts are worth reading!
@@ -106,6 +111,9 @@ EN_US_PACK = SummaryLanguagePack(
         "Be highly selective.",
         "Be concrete and actionable.",
         "Deep analysis must contain real substance.",
+        "Do not include any skipped/rejected/not-selected section in the final report, and do not list counts, titles, or reasons for discarded items. The final report should contain only items you actually recommend.",
+        "For each selected item, do not give a shallow one-liner. Cover at least: bottom-line judgment, core method/idea, why it matters, key limitation or risk, and what the reader should pay attention to.",
+        "Each item should be more complete than the current short summaries, but still controlled in length: aim for one compact overview paragraph plus 3 short bullets, not a one-line blurb and not a mini-essay.",
         "Visual style must stay light and clean. Use only #ffffff or #f8fafc for content block backgrounds and dark text such as #1e293b / #334155. Do not use dark cards or dark section backgrounds with light text.",
         "Each item must preserve the original clickable paper/blog URL exactly as provided above, using <a href=\"...\"> so feedback buttons can match entries reliably.",
         "Do not add an outer <div style=\"max-width:...\">, narrow centered column, or multiple layers of large padding/margin. The host page already provides width constraints via .content. Use flat <h2>, <p>, and <section> structure.",
@@ -130,6 +138,8 @@ For each paper AND blog post, you instinctively assess:
 - Sharp, concise, and technically grounded
 - English-first
 - Give clear judgments, not hedged summaries
+- Only show recommended items in the final report; do not add skipped/rejected lists
+- Each item needs substance, not a shallow blurb
 
 ## CRITICAL: Blog Post Filtering
 - NOT all blog posts are worth reading!

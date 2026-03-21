@@ -31,7 +31,9 @@ from .paths import (
     DEFAULT_USER_KEYWORDS_PATH,
 )
 
-load_dotenv()
+_cwd_dotenv = Path.cwd() / ".env"
+if _cwd_dotenv.exists():
+    load_dotenv(dotenv_path=_cwd_dotenv)
 
 
 def _parse_loose_bool(value: Any, *, default: bool) -> bool:

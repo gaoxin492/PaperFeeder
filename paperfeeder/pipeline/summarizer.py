@@ -5,6 +5,7 @@ Paper summarization using any LLM.
 from __future__ import annotations
 
 from datetime import datetime
+import re
 
 from paperfeeder.models import Paper
 from paperfeeder.chat import LLMClient
@@ -37,6 +38,21 @@ class PaperSummarizer:
         self.research_interests = research_interests
         self.prompt_addon = prompt_addon.strip()
         self.language_pack = get_summary_language_pack(prompt_language)
+
+    @staticmethod
+    def _strip_skip_sections(content: str) -> str:
+        if not content:
+            return content
+
+        patterns = (
+            r"<section\b[^>]*>\s*<(?:h1|h2|h3|h4|p)\b[^>]*>\s*(?:[^<]*?)?(?:⏭|跳过|未入选|skip(?:ped)?|rejected|not selected)[^<]*</(?:h1|h2|h3|h4|p)>.*?</section>",
+            r"<(?:h1|h2|h3|h4)\b[^>]*>\s*(?:[^<]*?)?(?:⏭|跳过|未入选|skip(?:ped)?|rejected|not selected)[^<]*</(?:h1|h2|h3|h4)>\s*(?:<(?:p|ul|ol|div)\b[^>]*>.*?</(?:p|ul|ol|div)>\s*){0,6}",
+        )
+
+        cleaned = content
+        for pattern in patterns:
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
+        return cleaned.strip()
 
     def _build_prompt(
         self,
@@ -205,6 +221,7 @@ Critical requirements:
 
         try:
             content = await self.client.achat(messages, max_tokens=8000)
+            content = self._strip_skip_sections(content)
             all_items = actual_papers + actual_blogs
             return self._wrap_html(content, all_items, actual_blogs)
         except Exception as exc:
