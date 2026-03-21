@@ -330,6 +330,9 @@ Critical requirements:
                 padding: 14px 12px;
                 box-shadow: 0 4px 14px rgba(148, 163, 184, 0.08);
             }}
+            .content section:first-of-type {{
+                padding: 16px 18px 18px;
+            }}
             .content section + section {{ margin-top: 18px; }}
             .content h2 {{
                 color: #1e293b;
@@ -375,6 +378,7 @@ Critical requirements:
                 .header h1 {{ font-size: 1.75rem; }}
                 .content {{ padding: 10px 3px 14px; }}
                 .content section {{ padding: 12px 10px; border-radius: 16px; }}
+                .content section:first-of-type {{ padding: 14px 14px 16px; }}
                 .content h2 {{ font-size: 0.98rem; margin: 26px 0 16px; }}
             }}
         </style>
