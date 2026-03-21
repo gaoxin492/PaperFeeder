@@ -1,5 +1,5 @@
 <h1 align="left">
-  <img src="icon.png" alt="PaperFeeder icon" width="44" style="vertical-align: middle; margin-right: 10px;" />
+  <img src=".github/assets/icon.png" alt="PaperFeeder icon" width="44" style="vertical-align: middle; margin-right: 10px;" />
   <span style="vertical-align: middle;">PaperFeeder（中文说明）</span>
 </h1>
 
@@ -8,6 +8,21 @@
 PaperFeeder 是围绕 inbox workflow 设计的：研究简报主要通过邮件交付，网页查看、manifest 和 feedback 流水线则用于补充审阅、回看与反馈收集。
 
 > 英文版说明见 [README.md](README.md)。
+
+## 界面预览
+
+<table>
+  <tr>
+    <td align="center"><img src=".github/assets/preview-overview.png" alt="Digest overview" width="240" /></td>
+    <td align="center"><img src=".github/assets/preview-paper-detail.png" alt="Paper detail" width="240" /></td>
+    <td align="center"><img src=".github/assets/preview-summary.png" alt="Executive summary and feedback" width="240" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>1.</strong> 总览页</td>
+    <td align="center"><strong>2.</strong> 单篇深读</td>
+    <td align="center"><strong>3.</strong> 判断摘要与快捷反馈</td>
+  </tr>
+</table>
 
 ## 为什么用 PaperFeeder
 

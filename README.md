@@ -1,5 +1,5 @@
 <h1 align="left">
-  <img src="icon.png" alt="PaperFeeder icon" width="44" style="vertical-align: middle; margin-right: 10px;" />
+  <img src=".github/assets/icon.png" alt="PaperFeeder icon" width="44" style="vertical-align: middle; margin-right: 10px;" />
   <span style="vertical-align: middle;">PaperFeeder</span>
 </h1>
 
@@ -8,6 +8,21 @@
 PaperFeeder is designed around an inbox workflow: the digest is delivered by email, while the web viewer, manifests, and feedback pipeline support review, iteration, and feedback collection around that core experience.
 
 **中文说明：** [README.zh-CN.md](README.zh-CN.md)
+
+## Preview
+
+<table>
+  <tr>
+    <td align="center"><img src=".github/assets/preview-overview.png" alt="Digest overview" width="240" /></td>
+    <td align="center"><img src=".github/assets/preview-paper-detail.png" alt="Paper detail" width="240" /></td>
+    <td align="center"><img src=".github/assets/preview-summary.png" alt="Executive summary and feedback" width="240" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>1.</strong> Overview</td>
+    <td align="center"><strong>2.</strong> Paper deep dive</td>
+    <td align="center"><strong>3.</strong> Summary + quick feedback</td>
+  </tr>
+</table>
 
 ## Why PaperFeeder
 
