@@ -54,6 +54,42 @@ class PaperSummarizer:
             cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
         return cleaned.strip()
 
+    @staticmethod
+    def _strip_raw_separators(content: str) -> str:
+        if not content:
+            return content
+
+        cleaned = re.sub(r"<p\b[^>]*>\s*(?:---+|___+)\s*</p>", "", content, flags=re.IGNORECASE)
+        cleaned = re.sub(r"<div\b[^>]*>\s*(?:---+|___+)\s*</div>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"(^|\n)\s*(?:---+|___+)\s*(?=\n|$)", "\n", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
+    @staticmethod
+    def _split_badge_and_title_lines(content: str) -> str:
+        if not content:
+            return content
+
+        cleaned = re.sub(
+            r"(</span>)\s*(<a\b[^>]*>)",
+            r"\1<br>\2",
+            content,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"(</span>)\s*(<strong\b[^>]*>)",
+            r"\1<br>\2",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"(</span>)\s*(<h[1-4]\b[^>]*>)",
+            r"\1\n\2",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        return cleaned
+
     def _build_prompt(
         self,
         papers: list[Paper],
@@ -222,6 +258,8 @@ Critical requirements:
         try:
             content = await self.client.achat(messages, max_tokens=8000)
             content = self._strip_skip_sections(content)
+            content = self._strip_raw_separators(content)
+            content = self._split_badge_and_title_lines(content)
             all_items = actual_papers + actual_blogs
             return self._wrap_html(content, all_items, actual_blogs)
         except Exception as exc:
@@ -250,39 +288,87 @@ Critical requirements:
             * {{ box-sizing: border-box; margin: 0; padding: 0; }}
             body {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-                line-height: 1.55;
-                color: #0f172a;
-                background: linear-gradient(180deg, #e8f2fc 0%, #f1f5f9 45%, #e2e8f0 100%);
-                /* One outer gutter only; inner padding lives in .header / .content to avoid triple side margins */
-                padding: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left));
+                line-height: 1.7;
+                color: #1e293b;
+                background: linear-gradient(180deg, #edf5fd 0%, #eff6ff 48%, #e2e8f0 100%);
+                padding: 18px 14px 24px;
+                padding:
+                    max(18px, calc(18px + env(safe-area-inset-top)))
+                    max(14px, calc(14px + env(safe-area-inset-right)))
+                    max(24px, calc(24px + env(safe-area-inset-bottom)))
+                    max(14px, calc(14px + env(safe-area-inset-left)));
                 font-size: clamp(15px, 2.8vw, 16px);
             }}
             .container {{
-                max-width: min(52rem, 100%);
+                max-width: min(48rem, 100%);
                 margin: 0 auto;
                 background: #fff;
-                border-radius: 14px;
-                box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
-                border: 1px solid rgba(148, 163, 184, 0.35);
+                border-radius: 26px;
+                box-shadow: 0 12px 36px rgba(30, 41, 59, 0.10);
+                border: 1px solid rgba(191, 219, 254, 0.9);
                 overflow: hidden;
             }}
             .header {{
                 background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
                 color: #0c4a6e;
-                padding: 6px 8px;
+                padding: 18px 20px 16px;
                 text-align: center;
-                border-bottom: 1px solid rgba(125, 211, 252, 0.5);
+                border-bottom: 1px solid rgba(125, 211, 252, 0.65);
             }}
-            .header h1 {{ font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: #0369a1; }}
-            .header .meta {{ margin-top: 6px; font-size: 0.9rem; color: #0e7490; }}
-            .header .persona {{ margin-top: 4px; font-size: 0.8rem; color: #64748b; }}
+            .header h1 {{ font-size: 1.95rem; font-weight: 800; letter-spacing: -0.03em; color: #0b6ea8; }}
+            .header .meta {{ margin-top: 10px; font-size: 0.98rem; font-weight: 500; color: #0e7490; line-height: 1.55; }}
+            .header .persona {{ margin-top: 10px; font-size: 0.82rem; color: #64748b; line-height: 1.5; }}
             .content {{
-                padding: 6px 8px 8px;
+                padding: 18px 16px 24px;
                 color: #1e293b;
             }}
-            .content h2, .content h3 {{ color: #0f172a; margin-top: 1em; }}
-            .content a {{ color: #2563eb; }}
-            .footer {{ text-align: center; padding: 6px 8px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #e2e8f0; background: #f8fafc; }}
+            .content > * + * {{ margin-top: 18px; }}
+            .content section + section {{ margin-top: 24px; }}
+            .content h2 {{
+                color: #1e293b;
+                font-size: 1.1rem;
+                font-weight: 800;
+                line-height: 1.3;
+                margin: 30px 0 18px;
+                padding: 0 0 12px;
+                border-bottom: 4px solid #3b82f6;
+            }}
+            .content h2:first-child {{ margin-top: 0; }}
+            .content h3 {{
+                color: #0f172a;
+                font-size: 1rem;
+                font-weight: 800;
+                line-height: 1.4;
+                margin: 20px 0 12px;
+            }}
+            .content p {{ margin: 0 0 14px; color: #475569; }}
+            .content ul, .content ol {{ margin: 0 0 16px 1.35em; color: #334155; }}
+            .content li + li {{ margin-top: 10px; }}
+            .content strong {{ color: #1e293b; }}
+            .content a {{ color: #2563eb; text-decoration: none; font-weight: 700; }}
+            .content blockquote {{
+                margin: 18px 0;
+                padding: 16px 18px;
+                background: #eff6ff;
+                border: 1px solid #dbeafe;
+                border-radius: 16px;
+            }}
+            .footer {{ text-align: center; padding: 12px 16px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #e2e8f0; background: #f8fafc; }}
+            @media (max-width: 640px) {{
+                body {{
+                    padding: 12px 10px 18px;
+                    padding:
+                        max(12px, calc(12px + env(safe-area-inset-top)))
+                        max(10px, calc(10px + env(safe-area-inset-right)))
+                        max(18px, calc(18px + env(safe-area-inset-bottom)))
+                        max(10px, calc(10px + env(safe-area-inset-left)));
+                }}
+                .container {{ border-radius: 22px; }}
+                .header {{ padding: 16px 16px 14px; }}
+                .header h1 {{ font-size: 1.75rem; }}
+                .content {{ padding: 16px 14px 20px; }}
+                .content h2 {{ font-size: 0.98rem; margin: 26px 0 16px; }}
+            }}
         </style>
     </head>
     <body>

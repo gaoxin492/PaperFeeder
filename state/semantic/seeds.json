@@ -1,22 +1,4 @@
 {
-  "positive_paper_ids": [
-    "CorpusId:270562552",
-    "CorpusId:278782853",
-    "CorpusId:279243094",
-    "CorpusId:282913080",
-    "CorpusId:283071677",
-    "CorpusId:284313495",
-    "CorpusId:284532011",
-    "CorpusId:285051079",
-    "CorpusId:285102353",
-    "CorpusId:285140238",
-    "CorpusId:285453329",
-    "06571d39f14fbd771423bf57c9a237faaf7994bf"
-  ],
-  "negative_paper_ids": [
-    "CorpusId:283933653",
-    "CorpusId:284311739",
-    "CorpusId:285285539",
-    "52cbf9238c1ca0f0e31a897654c1bd231882ee0d"
-  ]
+  "positive_paper_ids": [],
+  "negative_paper_ids": []
 }

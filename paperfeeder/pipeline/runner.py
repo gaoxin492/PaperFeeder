@@ -15,11 +15,8 @@ from paperfeeder.models import Paper, PaperSource
 from paperfeeder.semantic import (
     SemanticMemoryStore,
     append_feedback_fallback_strip,
-    build_feedback_run_view_url,
     export_run_feedback_manifest,
-    get_run_id_from_manifest,
     inject_feedback_actions_into_report,
-    inject_feedback_entry_link,
     make_email_safe_report_html,
     memory_keys_for_paper,
     publish_feedback_run_to_d1,
@@ -464,15 +461,6 @@ async def run_pipeline(
                 web_report = inject_feedback_actions_into_report(report, str(manifest_path))
                 web_report = append_feedback_fallback_strip(web_report, str(manifest_path))
                 email_report = make_email_safe_report_html(web_report)
-                run_id = get_run_id_from_manifest(str(manifest_path))
-                run_view_url = build_feedback_run_view_url(getattr(config, "feedback_endpoint_base_url", ""), run_id)
-                show_viewer = getattr(config, "feedback_web_viewer_link_in_email", True)
-                if isinstance(show_viewer, str):
-                    show_viewer = show_viewer.strip().lower() not in ("false", "0", "no", "off")
-                elif show_viewer is not True and show_viewer is not False:
-                    show_viewer = bool(show_viewer)
-                if run_view_url and show_viewer:
-                    email_report = inject_feedback_entry_link(email_report, run_view_url)
                 try:
                     publish_feedback_run_to_d1(
                         manifest_path=str(manifest_path),

@@ -13,6 +13,7 @@ from .feedback import (
     make_email_safe_report_html,
     publish_feedback_run_to_d1,
     queue_feedback_event,
+    reset_feedback_d1_state,
     verify_feedback_token,
 )
 from .memory import SemanticMemoryStore, memory_keys_for_paper
@@ -36,5 +37,6 @@ __all__ = [
     "memory_keys_for_paper",
     "publish_feedback_run_to_d1",
     "queue_feedback_event",
+    "reset_feedback_d1_state",
     "verify_feedback_token",
 ]

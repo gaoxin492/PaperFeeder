@@ -565,6 +565,34 @@ def publish_feedback_run_to_d1(
     return run_id
 
 
+def reset_feedback_d1_state(
+    *,
+    account_id: str | None = None,
+    api_token: str | None = None,
+    database_id: str | None = None,
+) -> Dict[str, Any]:
+    """Delete all feedback run HTML and queued/applied feedback events from D1."""
+    acc = account_id or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
+    tok = api_token or os.getenv("CLOUDFLARE_API_TOKEN", "")
+    dbid = database_id or os.getenv("D1_DATABASE_ID", "")
+    if not acc or not tok or not dbid:
+        raise ValueError("Missing D1 credentials (account_id/api_token/database_id)")
+
+    events_before_rows = _normalize_d1_rows(_d1_query(acc, tok, dbid, "SELECT COUNT(*) AS count FROM feedback_events"))
+    runs_before_rows = _normalize_d1_rows(_d1_query(acc, tok, dbid, "SELECT COUNT(*) AS count FROM feedback_runs"))
+    events_before = int(events_before_rows[0].get("count", 0) or 0) if events_before_rows else 0
+    runs_before = int(runs_before_rows[0].get("count", 0) or 0) if runs_before_rows else 0
+
+    _d1_execute(acc, tok, dbid, "DELETE FROM feedback_events")
+    _d1_execute(acc, tok, dbid, "DELETE FROM feedback_runs")
+
+    return {
+        "events_deleted": events_before,
+        "runs_deleted": runs_before,
+        "database_id": dbid,
+    }
+
+
 def _load_json(path: str) -> Dict[str, Any]:
     p = Path(path)
     if not p.exists():
