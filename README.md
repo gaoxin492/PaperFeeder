@@ -13,16 +13,30 @@ PaperFeeder is designed around an inbox workflow: the digest is delivered by ema
 
 <table>
   <tr>
-    <td align="center"><img src=".github/assets/preview-overview.png" alt="Digest overview" width="240" /></td>
-    <td align="center"><img src=".github/assets/preview-paper-detail.png" alt="Paper detail" width="240" /></td>
-    <td align="center"><img src=".github/assets/preview-summary.png" alt="Executive summary and feedback" width="240" /></td>
+    <td align="center"><img src=".github/assets/1.png" alt="Digest overview" width="260" /></td>
+    <td align="center"><img src=".github/assets/2.png" alt="Blog pick detail" width="260" /></td>
   </tr>
   <tr>
     <td align="center"><strong>1.</strong> Overview</td>
-    <td align="center"><strong>2.</strong> Paper deep dive</td>
-    <td align="center"><strong>3.</strong> Summary + quick feedback</td>
+    <td align="center"><strong>2.</strong> Blog pick detail</td>
+  </tr>
+  <tr>
+    <td align="center"><img src=".github/assets/3.png" alt="Paper pick detail" width="260" /></td>
+    <td align="center"><img src=".github/assets/4.png" alt="Judgment summary" width="260" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>3.</strong> Paper pick detail</td>
+    <td align="center"><strong>4.</strong> Judgment summary</td>
   </tr>
 </table>
+
+### Automation Preview
+
+GitHub Actions is the default path if you want PaperFeeder to behave like a scheduled remote service rather than a local script.
+
+<p align="center">
+  <img src=".github/assets/github_action.png" alt="GitHub Actions scheduled workflow" width="960" />
+</p>
 
 ## Why PaperFeeder
 
