@@ -4,6 +4,7 @@ Paper summarization using any LLM.
 
 from __future__ import annotations
 
+import html
 from datetime import datetime
 import re
 
@@ -286,6 +287,28 @@ Critical requirements:
             error_msg = f"<p class='error'>Error generating report: {str(exc)}</p>"
             return self._wrap_html(error_msg, actual_papers, actual_blogs)
 
+    def rewrap_existing_report_html(self, existing_html: str) -> str:
+        extracted_html = self._extract_report_payload_html(existing_html)
+        content = self._extract_existing_content(extracted_html)
+        content = self._wrap_lead_summary_block(content)
+        content = self._strip_existing_section_marks(content)
+        content = self._decorate_section_headings(content)
+        content = self._restyle_feedback_layout(content)
+        content = self._inline_title_links(content)
+        title_text = self._extract_first_match(extracted_html, r"<h1[^>]*>(.*?)</h1>") or self.language_pack.header_title
+        meta_text = self._extract_first_match(extracted_html, r'<div class="meta">(.*?)</div>')
+        persona_text = self._normalize_persona_text(
+            self._extract_first_match(extracted_html, r'<div class="persona">(.*?)</div>')
+        )
+        footer_text = self._extract_first_match(extracted_html, r'<div class="footer">(.*?)</div>')
+        return self._render_wrapped_html(
+            content=content,
+            header_title=title_text,
+            meta_text=meta_text or self.language_pack.reviewed_summary(0, 0),
+            persona_text=persona_text or self._normalize_persona_text(self.language_pack.persona_label),
+            footer_text=footer_text or f"PaperFeeder · {self.language_pack.footer_fallback}",
+        )
+
     def _wrap_html(self, content: str, papers: list[Paper], blog_posts: list[Paper] = None) -> str:
         pack = self.language_pack
         today = datetime.now()
@@ -294,6 +317,34 @@ Critical requirements:
         paper_count = len([paper for paper in papers if not getattr(paper, "is_blog", False)])
         blog_count = len(blog_posts) if blog_posts else 0
         meta_str = pack.reviewed_summary(paper_count, blog_count)
+        footer_text = f"PaperFeeder · {self._get_unique_keywords(papers)}"
+
+        return self._render_wrapped_html(
+            content=self._inline_title_links(
+                self._restyle_feedback_layout(
+                    self._decorate_section_headings(
+                        self._strip_existing_section_marks(self._wrap_lead_summary_block(content))
+                    )
+                )
+            ),
+            header_title=pack.header_title,
+            meta_text=f"{today_label} {weekday} · {meta_str}",
+            persona_text=self._normalize_persona_text(pack.persona_label),
+            footer_text=footer_text,
+        )
+
+    def _render_wrapped_html(
+        self,
+        *,
+        content: str,
+        header_title: str,
+        meta_text: str,
+        persona_text: str,
+        footer_text: str,
+    ) -> str:
+        pack = self.language_pack
+        today = datetime.now()
+        feedback_note = self._feedback_note_text()
 
         return f"""<!DOCTYPE html>
     <html>
@@ -310,7 +361,10 @@ Critical requirements:
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
                 line-height: 1.7;
                 color: #1e293b;
-                background: linear-gradient(180deg, #edf5fd 0%, #eff6ff 48%, #e2e8f0 100%);
+                background:
+                    radial-gradient(circle at top left, rgba(191, 219, 254, 0.75), transparent 34%),
+                    radial-gradient(circle at top right, rgba(186, 230, 253, 0.55), transparent 28%),
+                    linear-gradient(180deg, #eef6ff 0%, #f3f8ff 46%, #e7eef7 100%);
                 padding: 10px 2px 14px;
                 padding:
                     max(10px, calc(10px + env(safe-area-inset-top)))
@@ -322,60 +376,139 @@ Critical requirements:
             .container {{
                 max-width: min(48rem, 100%);
                 margin: 0 auto;
-                background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-                border-radius: 24px;
-                box-shadow: 0 12px 32px rgba(37, 99, 235, 0.08);
-                border: 1px solid rgba(191, 219, 254, 0.95);
+                background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, #f8fbff 100%);
+                border-radius: 28px;
+                box-shadow: 0 18px 44px rgba(37, 99, 235, 0.10);
+                border: 1px solid rgba(186, 230, 253, 0.95);
                 overflow: hidden;
             }}
             .header {{
-                background: linear-gradient(135deg, #eaf6ff 0%, #dff1ff 55%, #dbeafe 100%);
+                background:
+                    radial-gradient(circle at top, rgba(255,255,255,0.72), transparent 54%),
+                    linear-gradient(135deg, #eaf6ff 0%, #dff1ff 52%, #d7ebff 100%);
                 color: #0c4a6e;
-                padding: 14px 8px 12px;
+                padding: 18px 10px 14px;
                 text-align: center;
                 border-bottom: 1px solid rgba(125, 211, 252, 0.65);
             }}
-            .header h1 {{ font-size: 1.95rem; font-weight: 800; letter-spacing: -0.03em; color: #0a6aa1; text-shadow: 0 1px 0 rgba(255,255,255,0.55); }}
-            .header .meta {{ margin-top: 10px; font-size: 0.98rem; font-weight: 500; color: #0e7490; line-height: 1.55; }}
-            .header .persona {{ margin-top: 10px; font-size: 0.82rem; color: #64748b; line-height: 1.5; }}
+            .header h1 {{ font-size: 2.02rem; font-weight: 850; letter-spacing: -0.04em; color: #0a6aa1; text-shadow: 0 1px 0 rgba(255,255,255,0.6); }}
+            .header .meta {{ margin-top: 12px; font-size: 1rem; font-weight: 600; color: #0e7490; line-height: 1.5; }}
+            .header .persona {{ margin-top: 12px; font-size: 0.82rem; color: #64748b; line-height: 1.5; }}
             .content {{
-                padding: 12px 4px 16px;
+                padding: 14px 6px 18px;
                 color: #1e293b;
             }}
             .content > * + * {{ margin-top: 18px; }}
+            .section-mark {{
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 1.72em;
+                height: 1.72em;
+                margin-right: 0.48em;
+                border-radius: 999px;
+                font-size: 0.9em;
+                line-height: 1;
+                vertical-align: -0.18em;
+                background: linear-gradient(180deg, #e0f2fe 0%, #dbeafe 100%);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px rgba(96, 165, 250, 0.15);
+            }}
+            .section-mark.summary {{
+                background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+            }}
+            .section-mark.blog {{
+                background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
+            }}
+            .section-mark.paper {{
+                background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
+            }}
+            .section-mark.judgment {{
+                background: linear-gradient(180deg, #ede9fe 0%, #ddd6fe 100%);
+            }}
+            .section-mark.secondary {{
+                background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+            }}
+            .content .lead-summary {{
+                background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+                border: 1px solid #cfe3ff;
+                border-radius: 22px;
+                box-shadow: 0 10px 24px rgba(148, 163, 184, 0.10);
+                padding: 24px 30px 26px;
+                margin: 4px 10px 24px;
+            }}
+            .content .lead-summary > * + * {{ margin-top: 14px; }}
+            .content .lead-summary h2 {{ margin-top: 0; }}
+            .content .lead-summary p:last-child {{ margin-bottom: 0; }}
             .content section {{
-                background: #ffffff;
-                border: 1px solid #dbeafe;
-                border-radius: 18px;
-                padding: 14px 12px;
-                box-shadow: 0 4px 14px rgba(148, 163, 184, 0.08);
+                background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+                border: 1px solid #d9eafe;
+                border-radius: 20px;
+                padding: 16px 14px;
+                box-shadow: 0 8px 18px rgba(148, 163, 184, 0.09);
             }}
             .content section:first-of-type {{
-                padding: 18px 28px 20px;
+                padding: 20px 34px 22px;
             }}
             .content section + section {{ margin-top: 18px; }}
             .content h2 {{
                 color: #1e293b;
-                font-size: 1.1rem;
+                font-size: 1.12rem;
                 font-weight: 800;
                 line-height: 1.3;
-                margin: 24px 0 14px;
-                padding: 0 0 10px;
-                border-bottom: 3px solid #60a5fa;
+                margin: 28px 0 16px;
+                padding: 0 0 12px;
+                border-bottom: 2px solid rgba(96, 165, 250, 0.36);
             }}
             .content h2:first-child {{ margin-top: 0; }}
             .content h3 {{
                 color: #0f172a;
-                font-size: 1rem;
+                font-size: 1.02rem;
                 font-weight: 800;
                 line-height: 1.4;
                 margin: 16px 0 10px;
             }}
-            .content p {{ margin: 0 0 12px; color: #475569; }}
+            .content h3 a, .pf-brief-title a {{ color: inherit; text-decoration: none; font-weight: inherit; }}
+            .content h3 a:hover, .pf-brief-title a:hover {{ color: #1d4ed8; }}
+            .content p {{ margin: 0 0 12px; color: #475569; font-size: 1.02rem; }}
             .content ul, .content ol {{ margin: 0 0 16px 1.35em; color: #334155; }}
             .content li + li {{ margin-top: 10px; }}
             .content strong {{ color: #1e293b; }}
             .content a {{ color: #2563eb; text-decoration: none; font-weight: 700; }}
+            .pf-brief-link, .pf-brief-comment {{ margin-top: 10px; }}
+            .pf-feedback-row, .pf-brief-title, .pf-brief-link, .pf-brief-comment {{ display: block; }}
+            .pf-brief-link {{ font-size: 0.9rem; color: #516072; }}
+            .pf-brief-link a {{ display: inline-block; font-size: 0.92rem; }}
+            .content section h3 + div a {{ display: inline-block; margin-top: 6px; }}
+            .pf-feedback-row {{
+                margin-top: 12px;
+                padding: 10px 12px;
+                background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+                border: 1px solid #d7e9ff;
+                border-radius: 14px;
+            }}
+            .pf-feedback-actions {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }}
+            .pf-feedback-btn {{
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 34px;
+                width: 100%;
+                padding: 6px 10px;
+                border-radius: 999px;
+                font-size: 0.82rem;
+                font-weight: 800;
+                line-height: 1.2;
+                border: 1px solid transparent;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+                white-space: nowrap;
+            }}
+            .pf-feedback-btn.positive {{ background: #dcfce7; color: #166534; border-color: #bbf7d0; }}
+            .pf-feedback-btn.negative {{ background: #fee2e2; color: #b91c1c; border-color: #fecaca; }}
+            .pf-feedback-btn.undecided {{ background: #fef3c7; color: #92400e; border-color: #fde68a; }}
+            .pf-brief-item {{ list-style: none; margin-left: 0; padding-left: 0; }}
+            .pf-brief-item + .pf-brief-item {{ margin-top: 16px; }}
+            .pf-brief-title strong {{ font-size: 1rem; color: #0f172a; }}
+            .pf-brief-comment {{ color: #334155; line-height: 1.8; }}
             .content blockquote {{
                 margin: 18px 0;
                 padding: 16px 18px;
@@ -383,7 +516,8 @@ Critical requirements:
                 border: 1px solid #cfe3ff;
                 border-radius: 16px;
             }}
-            .footer {{ text-align: center; padding: 12px 16px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff 0%, #f8fafc 100%); }}
+            .footer {{ text-align: center; padding: 14px 18px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff 0%, #f8fafc 100%); }}
+            .footer-note {{ margin-top: 7px; font-size: 0.72rem; line-height: 1.55; color: #7c8aa0; max-width: 44rem; margin-left: auto; margin-right: auto; }}
             @media (max-width: 640px) {{
                 body {{
                     padding: 8px 1px 12px;
@@ -393,32 +527,242 @@ Critical requirements:
                         max(12px, calc(12px + env(safe-area-inset-bottom)))
                         max(1px, calc(1px + env(safe-area-inset-left)));
                 }}
-                .container {{ border-radius: 20px; }}
-                .header {{ padding: 12px 6px 10px; }}
-                .header h1 {{ font-size: 1.75rem; }}
+                .container {{ border-radius: 22px; }}
+                .header {{ padding: 14px 8px 12px; }}
+                .header h1 {{ font-size: 1.78rem; }}
                 .content {{ padding: 10px 3px 14px; }}
+                .section-mark {{ width: 1.6em; height: 1.6em; margin-right: 0.42em; }}
+                .content .lead-summary {{ padding: 18px 20px 20px; margin: 2px 6px 20px; border-radius: 18px; }}
                 .content section {{ padding: 12px 10px; border-radius: 16px; }}
-                .content section:first-of-type {{ padding: 16px 18px 18px; }}
+                .content section:first-of-type {{ padding: 18px 22px 20px; }}
                 .content h2 {{ font-size: 0.98rem; margin: 26px 0 16px; }}
+                .pf-feedback-row {{ padding: 9px 10px; }}
+                .pf-feedback-actions {{ gap: 6px; }}
+                .pf-feedback-btn {{ min-height: 32px; padding: 6px 8px; font-size: 0.76rem; }}
             }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>{pack.header_title}</h1>
-                <div class="meta">{today_label} {weekday} · {meta_str}</div>
-                <div class="persona">{pack.persona_label}</div>
+                <h1>{header_title}</h1>
+                <div class="meta">{meta_text}</div>
+                <div class="persona">{persona_text}</div>
             </div>
             <div class="content">
                 {content}
             </div>
             <div class="footer">
-                PaperFeeder · {self._get_unique_keywords(papers)}
+                {footer_text}
+                <div class="footer-note">{feedback_note}</div>
             </div>
         </div>
     </body>
     </html>"""
+
+    @staticmethod
+    def _extract_first_match(value: str, pattern: str) -> str:
+        if not value:
+            return ""
+        match = re.search(pattern, value, flags=re.IGNORECASE | re.DOTALL)
+        if not match:
+            return ""
+        return html.unescape(match.group(1).strip())
+
+    @staticmethod
+    def _extract_existing_content(existing_html: str) -> str:
+        if not existing_html:
+            return ""
+        match = re.search(
+            r'<div class="content">\s*(.*)\s*</div>\s*<div class="footer">',
+            existing_html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if match:
+            return match.group(1).strip()
+        body_match = re.search(r"<body[^>]*>(.*)</body>", existing_html, flags=re.IGNORECASE | re.DOTALL)
+        if body_match:
+            return body_match.group(1).strip()
+        return existing_html.strip()
+
+    @staticmethod
+    def _extract_report_payload_html(existing_html: str) -> str:
+        if not existing_html:
+            return ""
+
+        report_match = re.search(
+            r'<div\s+id="contentDiv\d+"[^>]*>(.*?)</div>\s*<div class="qqmail_attachment_listmargin">',
+            existing_html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if not report_match:
+            return existing_html
+
+        report_html = report_match.group(1).strip()
+        container_match = re.search(
+            r'<div class="container">.*?<div class="footer">.*?</div>\s*</div>',
+            report_html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if container_match:
+            return container_match.group(0).strip()
+
+        return report_html
+
+    @staticmethod
+    def _wrap_lead_summary_block(content: str) -> str:
+        if not content or 'class="lead-summary"' in content:
+            return content
+
+        match = re.search(
+            r'^\s*(<h2[^>]*>.*?</h2>\s*(?:<p[^>]*>.*?</p>\s*)+)(.*)$',
+            content,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if not match:
+            return content
+
+        lead_block = match.group(1).strip()
+        rest = match.group(2).lstrip()
+        wrapped = f'<div class="lead-summary">{lead_block}</div>'
+        if rest:
+            wrapped = f"{wrapped}\n\n{rest}"
+        return wrapped
+
+    @staticmethod
+    def _normalize_persona_text(persona_text: str) -> str:
+        if not persona_text:
+            return ""
+        normalized = re.sub(r"\s*[·•|｜]\s*No fluff, no hype", "", persona_text, flags=re.IGNORECASE)
+        normalized = re.sub(r"\s{2,}", " ", normalized)
+        return normalized.strip(" ·•|｜")
+
+    @staticmethod
+    def _strip_existing_section_marks(content: str) -> str:
+        if not content:
+            return content
+        return re.sub(r'<span class="section-mark(?: [^"]+)?">.*?</span>\s*', "", content, flags=re.IGNORECASE | re.DOTALL)
+
+    @staticmethod
+    def _decorate_section_headings(content: str) -> str:
+        if not content:
+            return content
+
+        heading_map = {
+            "今日筛选报告": ('<span class="section-mark summary">🧭</span>', "今日筛选报告"),
+            "博客筛选": ('<span class="section-mark blog">📰</span>', "博客筛选"),
+            "论文筛选": ('<span class="section-mark paper">📄</span>', "论文筛选"),
+            "今日判断摘要": ('<span class="section-mark judgment">📝</span>', "今日判断摘要"),
+            "值得知道但暂不主推": ('<span class="section-mark secondary">👀</span>', "值得知道但暂不主推"),
+            "Screening Summary": ('<span class="section-mark summary">🧭</span>', "Screening Summary"),
+            "Blog Picks": ('<span class="section-mark blog">📰</span>', "Blog Picks"),
+            "Paper Picks": ('<span class="section-mark paper">📄</span>', "Paper Picks"),
+            "Judgment Summary": ('<span class="section-mark judgment">📝</span>', "Judgment Summary"),
+            "Worth Knowing, Not Main Picks": ('<span class="section-mark secondary">👀</span>', "Worth Knowing, Not Main Picks"),
+        }
+
+        def replace_heading(match: re.Match[str]) -> str:
+            tag = match.group(1)
+            attrs = match.group(2)
+            inner = match.group(3).strip()
+            plain_inner = re.sub(r"<[^>]+>", "", inner).strip()
+            if 'section-mark' in inner or plain_inner not in heading_map:
+                return match.group(0)
+            marker, label = heading_map[plain_inner]
+            return f"<{tag}{attrs}>{marker}{label}</{tag}>"
+
+        return re.sub(r"<(h[23])([^>]*)>(.*?)</\1>", replace_heading, content, flags=re.IGNORECASE | re.DOTALL)
+
+    @staticmethod
+    def _restyle_feedback_layout(content: str) -> str:
+        if not content or "pf-feedback-actions" not in content:
+            return content
+
+        def rewrite_brief_item(match: re.Match[str]) -> str:
+            body = match.group(1)
+            if "pf-feedback-actions" not in body:
+                return match.group(0)
+
+            body_match = re.match(
+                r'\s*(<strong>.*?</strong>)（\s*(<a [^>]+>.*?</a>)\s*(<span class="pf-feedback-actions">.*?</span>)\s*）[:：]\s*(.*)\s*$',
+                body,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if not body_match:
+                return match.group(0)
+
+            title_html = body_match.group(1).strip()
+            link_html = body_match.group(2).strip()
+            feedback_html = body_match.group(3).strip()
+            comment_html = body_match.group(4).strip()
+            return (
+                '<li class="pf-brief-item">'
+                f'<div class="pf-brief-title">{title_html}</div>'
+                f'<div class="pf-brief-link">{link_html}</div>'
+                f'<div class="pf-feedback-row">{feedback_html}</div>'
+                f'<div class="pf-brief-comment">{comment_html}</div>'
+                '</li>'
+            )
+
+        content = re.sub(
+            r'<li>(.*?)</li>',
+            rewrite_brief_item,
+            content,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        return content
+
+    @staticmethod
+    def _inline_title_links(content: str) -> str:
+        if not content or "<a " not in content:
+            return content
+
+        def rewrite_card_title(match: re.Match[str]) -> str:
+            h3_open = match.group(1)
+            title_html = match.group(2).strip()
+            div_attrs = match.group(4) or ""
+            meta_html = match.group(5).strip()
+            link_html = match.group(6).strip()
+            feedback_html = (match.group(7) or "").strip()
+            href_match = re.search(r'href="([^"]+)"', link_html, flags=re.IGNORECASE)
+            if not href_match:
+                return match.group(0)
+            href = href_match.group(1)
+            linked_title = f'{h3_open}<a href="{href}" target="_blank">{title_html}</a></h3>'
+            meta_line = f'<div{div_attrs}>{meta_html}</div>'
+            if feedback_html:
+                feedback_block = f'<div class="pf-feedback-row"><span class="pf-feedback-actions">{feedback_html}</span></div>'
+                return f'{linked_title}\n  {meta_line}{feedback_block}'
+            return f'{linked_title}\n  {meta_line}'
+
+        content = re.sub(
+            r'(<h3[^>]*>)(.*?)</h3>\s*(<div([^>]*)>)\s*((?:作者：|来源：)[^<]*?)\s*&nbsp;\|&nbsp;\s*(<a [^>]+>.*?</a>)\s*(?:<span class="pf-feedback-actions">(.*?)</span>)?\s*</div>',
+            rewrite_card_title,
+            content,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        def rewrite_brief_title(match: re.Match[str]) -> str:
+            title_html = match.group(1).strip()
+            link_html = match.group(2).strip()
+            href_match = re.search(r'href="([^"]+)"', link_html, flags=re.IGNORECASE)
+            if not href_match:
+                return match.group(0)
+            href = href_match.group(1)
+            return f'<div class="pf-brief-title"><a href="{href}" target="_blank">{title_html}</a></div>'
+
+        content = re.sub(
+            r'<div class="pf-brief-title">(.*?)</div>\s*<div class="pf-brief-link">(<a [^>]+>.*?</a>)</div>',
+            rewrite_brief_title,
+            content,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        return content
+
+    def _feedback_note_text(self) -> str:
+        if self.language_pack.code == "zh-CN":
+            return "注：如果论文没有 Semantic Scholar ID，则不会显示 Like / Dislike feedback。"
+        return "Note: papers without a Semantic Scholar ID will not show Like / Dislike feedback."
 
     def _get_unique_keywords(self, papers: list[Paper]) -> str:
         keywords = set()

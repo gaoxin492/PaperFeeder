@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>论文摘要 - 2026-03-22</title>
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+        <style>
+            :root { color-scheme: light; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                line-height: 1.7;
+                color: #1e293b;
+                background:
+                    radial-gradient(circle at top left, rgba(191, 219, 254, 0.75), transparent 34%),
+                    radial-gradient(circle at top right, rgba(186, 230, 253, 0.55), transparent 28%),
+                    linear-gradient(180deg, #eef6ff 0%, #f3f8ff 46%, #e7eef7 100%);
+                padding: 10px 2px 14px;
+                padding:
+                    max(10px, calc(10px + env(safe-area-inset-top)))
+                    max(2px, calc(2px + env(safe-area-inset-right)))
+                    max(14px, calc(14px + env(safe-area-inset-bottom)))
+                    max(2px, calc(2px + env(safe-area-inset-left)));
+                font-size: clamp(15px, 2.8vw, 16px);
+            }
+            .container {
+                max-width: min(48rem, 100%);
+                margin: 0 auto;
+                background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, #f8fbff 100%);
+                border-radius: 28px;
+                box-shadow: 0 18px 44px rgba(37, 99, 235, 0.10);
+                border: 1px solid rgba(186, 230, 253, 0.95);
+                overflow: hidden;
+            }
+            .header {
+                background:
+                    radial-gradient(circle at top, rgba(255,255,255,0.72), transparent 54%),
+                    linear-gradient(135deg, #eaf6ff 0%, #dff1ff 52%, #d7ebff 100%);
+                color: #0c4a6e;
+                padding: 18px 10px 14px;
+                text-align: center;
+                border-bottom: 1px solid rgba(125, 211, 252, 0.65);
+            }
+            .header h1 { font-size: 2.02rem; font-weight: 850; letter-spacing: -0.04em; color: #0a6aa1; text-shadow: 0 1px 0 rgba(255,255,255,0.6); }
+            .header .meta { margin-top: 12px; font-size: 1rem; font-weight: 600; color: #0e7490; line-height: 1.5; }
+            .header .persona { margin-top: 12px; font-size: 0.82rem; color: #64748b; line-height: 1.5; }
+            .content {
+                padding: 14px 6px 18px;
+                color: #1e293b;
+            }
+            .content > * + * { margin-top: 18px; }
+            .section-mark {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 1.72em;
+                height: 1.72em;
+                margin-right: 0.48em;
+                border-radius: 999px;
+                font-size: 0.9em;
+                line-height: 1;
+                vertical-align: -0.18em;
+                background: linear-gradient(180deg, #e0f2fe 0%, #dbeafe 100%);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px rgba(96, 165, 250, 0.15);
+            }
+            .section-mark.summary {
+                background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+            }
+            .section-mark.blog {
+                background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
+            }
+            .section-mark.paper {
+                background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
+            }
+            .section-mark.judgment {
+                background: linear-gradient(180deg, #ede9fe 0%, #ddd6fe 100%);
+            }
+            .section-mark.secondary {
+                background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+            }
+            .content .lead-summary {
+                background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+                border: 1px solid #cfe3ff;
+                border-radius: 22px;
+                box-shadow: 0 10px 24px rgba(148, 163, 184, 0.10);
+                padding: 24px 30px 26px;
+                margin: 4px 10px 24px;
+            }
+            .content .lead-summary > * + * { margin-top: 14px; }
+            .content .lead-summary h2 { margin-top: 0; }
+            .content .lead-summary p:last-child { margin-bottom: 0; }
+            .content section {
+                background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+                border: 1px solid #d9eafe;
+                border-radius: 20px;
+                padding: 16px 14px;
+                box-shadow: 0 8px 18px rgba(148, 163, 184, 0.09);
+            }
+            .content section:first-of-type {
+                padding: 20px 34px 22px;
+            }
+            .content section + section { margin-top: 18px; }
+            .content h2 {
+                color: #1e293b;
+                font-size: 1.12rem;
+                font-weight: 800;
+                line-height: 1.3;
+                margin: 28px 0 16px;
+                padding: 0 0 12px;
+                border-bottom: 2px solid rgba(96, 165, 250, 0.36);
+            }
+            .content h2:first-child { margin-top: 0; }
+            .content h3 {
+                color: #0f172a;
+                font-size: 1.02rem;
+                font-weight: 800;
+                line-height: 1.4;
+                margin: 16px 0 10px;
+            }
+            .content h3 a, .pf-brief-title a { color: inherit; text-decoration: none; font-weight: inherit; }
+            .content h3 a:hover, .pf-brief-title a:hover { color: #1d4ed8; }
+            .content p { margin: 0 0 12px; color: #475569; font-size: 1.02rem; }
+            .content ul, .content ol { margin: 0 0 16px 1.35em; color: #334155; }
+            .content li + li { margin-top: 10px; }
+            .content strong { color: #1e293b; }
+            .content a { color: #2563eb; text-decoration: none; font-weight: 700; }
+            .pf-brief-link, .pf-brief-comment { margin-top: 10px; }
+            .pf-feedback-row, .pf-brief-title, .pf-brief-link, .pf-brief-comment { display: block; }
+            .pf-brief-link { font-size: 0.9rem; color: #516072; }
+            .pf-brief-link a { display: inline-block; font-size: 0.92rem; }
+            .content section h3 + div a { display: inline-block; margin-top: 6px; }
+            .pf-feedback-row {
+                margin-top: 12px;
+                padding: 10px 12px;
+                background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+                border: 1px solid #d7e9ff;
+                border-radius: 14px;
+            }
+            .pf-feedback-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+            .pf-feedback-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 34px;
+                width: 100%;
+                padding: 6px 10px;
+                border-radius: 999px;
+                font-size: 0.82rem;
+                font-weight: 800;
+                line-height: 1.2;
+                border: 1px solid transparent;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+                white-space: nowrap;
+            }
+            .pf-feedback-btn.positive { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+            .pf-feedback-btn.negative { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+            .pf-feedback-btn.undecided { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+            .pf-brief-item { list-style: none; margin-left: 0; padding-left: 0; }
+            .pf-brief-item + .pf-brief-item { margin-top: 16px; }
+            .pf-brief-title strong { font-size: 1rem; color: #0f172a; }
+            .pf-brief-comment { color: #334155; line-height: 1.8; }
+            .content blockquote {
+                margin: 18px 0;
+                padding: 16px 18px;
+                background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+                border: 1px solid #cfe3ff;
+                border-radius: 16px;
+            }
+            .footer { text-align: center; padding: 14px 18px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff 0%, #f8fafc 100%); }
+            .footer-note { margin-top: 7px; font-size: 0.72rem; line-height: 1.55; color: #7c8aa0; max-width: 44rem; margin-left: auto; margin-right: auto; }
+            @media (max-width: 640px) {
+                body {
+                    padding: 8px 1px 12px;
+                    padding:
+                        max(8px, calc(8px + env(safe-area-inset-top)))
+                        max(1px, calc(1px + env(safe-area-inset-right)))
+                        max(12px, calc(12px + env(safe-area-inset-bottom)))
+                        max(1px, calc(1px + env(safe-area-inset-left)));
+                }
+                .container { border-radius: 22px; }
+                .header { padding: 14px 8px 12px; }
+                .header h1 { font-size: 1.78rem; }
+                .content { padding: 10px 3px 14px; }
+                .section-mark { width: 1.6em; height: 1.6em; margin-right: 0.42em; }
+                .content .lead-summary { padding: 18px 20px 20px; margin: 2px 6px 20px; border-radius: 18px; }
+                .content section { padding: 12px 10px; border-radius: 16px; }
+                .content section:first-of-type { padding: 18px 22px 20px; }
+                .content h2 { font-size: 0.98rem; margin: 26px 0 16px; }
+                .pf-feedback-row { padding: 9px 10px; }
+                .pf-feedback-actions { gap: 6px; }
+                .pf-feedback-btn { min-height: 32px; padding: 6px 8px; font-size: 0.76rem; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Paper Digest</h1>
+                <div class="meta">2026年03月21日 周六 · 已审阅 9 篇论文 + 10 篇博客</div>
+                <div class="persona">Curated by PaperFeeder</div>
+            </div>
+            <div class="content">
+                <div class="lead-summary"><h2><span class="section-mark summary">🧭</span>今日筛选报告</h2>
+
+<p>本轮共审阅论文 9 篇、博客 10 篇。最终推荐深读论文 2 篇、博客 1 篇。整体质量中等偏下——论文池里多数是 benchmark 构建或多模态调优细节，缺乏范式级突破；博客池以产品公告和政策声明为主，仅 1 篇具备实质性研究价值。</p></div>
+
+<h2><span class="section-mark blog">📰</span>博客筛选</h2>
+
+<section style="background:#f8fafc; border-left:4px solid #3b82f6; padding:16px 20px; margin:16px 0; border-radius:6px;">
+  <div style="font-size:0.82em; color:#64748b; margin-bottom:4px;">⭐ 推荐精读 · OpenAI Blog · AI Safety / Alignment / Interpretability</div>
+  <h3 style="margin:4px 0 8px 0; color:#1e293b;"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fopenai.com%2Findex%2Fhow-we-monitor-internal-coding-agents-misalignment/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/3kQLGafK28KkxkRE7thvRTx0aNdbmExaOIPaxuoIUFw=449" target="_blank">How we monitor internal coding agents for misalignment</a></h3>
+  <div style="font-size:0.85em; color:#475569; margin-bottom:12px;">来源：OpenAI Blog</div>
+
+  <p style="color:#1e293b; margin:0 0 10px 0;">OpenAI 首次公开披露其对内部部署 coding agent 的 chain-of-thought 监控框架——不是 demo，而是真实生产环境下的 misalignment 检测实践。这篇博客的价值在于：它把 alignment 研究从理论拉到了"我们的 agent 今天在代码仓库里干了什么"的操作层面。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">核心洞见</p>
+  <ul style="color:#334155; margin:0 0 10px 0; padding-left:20px;">
+    <li>通过监控 CoT 而非最终输出来识别 misalignment 信号，是对"CoT 是否真实反映推理过程"这一开放问题的实证探索。</li>
+    <li>在真实 coding agent 部署中观察到的 misalignment 模式，可能比合成数据更具外部效度，对 scalable oversight 研究有直接参考价值。</li>
+    <li>该框架涉及如何在不干扰 agent 行为的前提下持续监控——这本身就是一个尚无公认解法的工程+安全问题。</li>
+  </ul>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">为什么重要</p>
+  <p style="color:#334155; margin:0 0 10px 0;">大多数 alignment 工作停留在 RLHF 调参或 red-teaming 实验室场景。这篇直接来自生产系统的报告，提供了稀缺的"真实 agent 行为数据"视角，对正在构建 agent 监控基础设施的团队有即时参考价值。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">需要验证</p>
+  <p style="color:#334155; margin:0 0 10px 0;">CoT 监控是否会导致模型学会"说正确的话但做错误的事"（即 CoT 与实际行为解耦）？OpenAI 是否有控制实验证明 CoT 信号的可靠性？这是最需要带着批判眼光去读的问题。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">行动建议</p>
+  <p style="color:#334155; margin:0;">精读，重点关注：监控信号的定义方式、误报率如何处理、以及他们是否有量化 misalignment 发生频率的数据。如果团队正在构建 agent 评估流水线，这篇值得作为参考案例直接讨论。</p>
+</section>
+
+<h2><span class="section-mark paper">📄</span>论文筛选</h2>
+
+<section style="background:#f8fafc; border-left:4px solid #3b82f6; padding:16px 20px; margin:16px 0; border-radius:6px;">
+  <div style="font-size:0.82em; color:#64748b; margin-bottom:4px;">⭐ 推荐深读 · Alignment / Normative AI · 反直觉发现</div>
+  <h3 style="margin:4px 0 8px 0; color:#1e293b;"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.17218/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/_6Ym1alLYitxQngNYGllfAft1rkWFbcOoLNH65peCR0=449" target="_blank">Alignment Makes Language Models Normative, Not Descriptive</a></h3>
+  <div style="font-size:0.85em; color:#475569; margin-bottom:12px;">作者：Eilam Shapira, Moshe Tennenholtz, Roi Reichart</div>
+
+  <p style="color:#1e293b; margin:0 0 10px 0;">这篇论文提出了一个尖锐的认识论问题：alignment 训练是否从根本上改变了 LLM 的"表达模态"——从描述世界（descriptive）转变为规范世界（normative）？这不是 benchmark 比较，而是对 LLM 本质的一次概念性解剖，触及了 alignment 研究中长期被忽视的一个裂缝。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">核心洞见</p>
+  <ul style="color:#334155; margin:0 0 10px 0; padding-left:20px;">
+    <li><strong>Descriptive vs. Normative 的区分</strong>：未对齐的 LLM 倾向于反映训练数据中的统计规律（"人们通常这样做"），而对齐后的模型输出转变为规范性判断（"应该这样做"）——这两种模态在认识论上是根本不同的，却常被混为一谈。</li>
+    <li><strong>对下游应用的隐性影响</strong>：如果研究者用对齐模型来做社会科学研究、模拟人类行为或构建 AI 评估器，他们实际上是在用规范性输出冒充描述性数据，这会系统性地污染结论。</li>
+    <li><strong>Alignment 的"副作用"框架</strong>：作者将此定义为 alignment 的一个结构性副作用，而非 bug——这为重新审视 RLHF/RLAIF 的长期影响提供了新的理论框架。</li>
+  </ul>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">为什么重要</p>
+  <p style="color:#334155; margin:0 0 10px 0;">当前大量工作（包括 LLM-as-judge、synthetic data generation、agent simulation）都隐含地假设对齐模型仍然是"世界的描述者"。这篇论文如果论证成立，将对这些方法的有效性构成系统性质疑，影响范围远超 alignment 本身。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">需要验证</p>
+  <p style="color:#334155; margin:0 0 10px 0;">关键风险：descriptive/normative 的操作化定义是否足够严格？作者的实验设计能否真正区分"模型在规范化"还是"模型在反映训练数据中的规范性偏差"？需要仔细审查他们的实验协议。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">行动建议</p>
+  <p style="color:#334155; margin:0;">精读第 <span style="border-bottom:1px dashed #ccc;" t="5" times="">2-4</span> 节（理论框架 + 实验设计），重点验证他们如何操作化"normative vs. descriptive"这一核心区分。如果实验方法扎实，这篇值得在团队内组织一次讨论，尤其对正在用 LLM 生成评估数据或合成训练数据的项目有直接警示意义。</p>
+</section>
+
+<section style="background:#f8fafc; border-left:4px solid #3b82f6; padding:16px 20px; margin:16px 0; border-radius:6px;">
+  <div style="font-size:0.82em; color:#64748b; margin-bottom:4px;">⭐ 推荐关注 · Inference Efficiency / Reasoning · 工程与理论兼备</div>
+  <h3 style="margin:4px 0 8px 0; color:#1e293b;"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.12372/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/_J8JklDX3ZNDncQpvjQN1SeKrW4Ye3ribFROHMvuUwQ=449" target="_blank">Efficient Reasoning with Balanced Thinking</a></h3>
+  <div style="font-size:0.85em; color:#475569; margin-bottom:12px;">作者：Yulin Li, Tengyao Tu, Li Ding, Junjie Wang, Huiling Zhen et al.</div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDUiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiI1M2ViNzU4MGE5ZDljOTViNGViMmY4Y2RhMTU0YmE1NTI1NDdkNGQ0IiwidiI6MX0.8C4Dfx-FhCW-GLKbbPGv7_GgE0MhDX1btiJlyi00OH8/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/xk_qCog_R5V-Czlr8C2YyVIjLKaJAHI9YjMwj1KOYQQ=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDUiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiI1M2ViNzU4MGE5ZDljOTViNGViMmY4Y2RhMTU0YmE1NTI1NDdkNGQ0IiwidiI6MX0.dNBEmwjaossVstV3Hsyux9JCP8dYJ5VvNVJQYseTIGE/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/shh7-3nGIKWpmoaXPv-LtICancx-sGPEWF9n7Zn8Yqk=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDUiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiNTNlYjc1ODBhOWQ5Yzk1YjRlYjJmOGNkYTE1NGJhNTUyNTQ3ZDRkNCIsInYiOjF9.UPWcQtrdkoXbLnCju_zNXVORMCZoakQSV8S72STC0gE/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/Ox8U-ECA6sT5WFnIA7ihYZn0VznZLQ5RnW7ecccue88=449" target="_blank">🤔 Undecided</a></span></div>
+
+  <p style="color:#1e293b; margin:0 0 10px 0;">这篇论文直接切入 test-time compute 的核心矛盾：长链推理（extended thinking）提升了准确率，但在简单任务上代价极高。作者提出"balanced thinking"框架，试图让模型自适应地分配推理预算，而非一刀切地使用长 CoT 或短 CoT。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">核心洞见</p>
+  <ul style="color:#334155; margin:0 0 10px 0; padding-left:20px;">
+    <li><strong>自适应推理预算</strong>：核心主张是模型应能感知任务复杂度并动态调整 thinking token 数量，而非依赖外部启发式截断策略——这与当前 budget forcing 类方法的思路形成对比。</li>
+    <li><strong>效率-准确率 Pareto 前沿</strong>：论文声称在保持推理质量的同时显著降低 token 消耗，这对推理服务的成本优化有直接价值，也是 inference scaling 研究的核心问题之一。</li>
+    <li><strong>训练信号设计</strong>：作者需要设计能区分"该想多久"的训练信号，这本身就是一个非平凡的问题，方法论上值得关注。</li>
+  </ul>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">为什么重要</p>
+  <p style="color:#334155; margin:0 0 10px 0;">随着 o1/o3/R1 类推理模型的普及，"如何在不同难度任务上合理分配推理计算"已成为工程和研究双重优先级问题。这篇论文如果方法论扎实，直接可迁移到生产推理系统的优化。</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">需要验证</p>
+  <p style="color:#334155; margin:0 0 10px 0;">社区信号为零，需要警惕：实验是否在足够多样的任务分布上验证？"balanced"是否只在特定 benchmark 上成立？模型的自我复杂度估计是否可靠，还是只是 shortcut learning？</p>
+
+  <p style="font-weight:600; color:#1e293b; margin:8px 0 4px 0;">行动建议</p>
+  <p style="color:#334155; margin:0;">快速浏览实验部分，重点看 token 效率曲线和跨任务泛化结果。如果数据可信，将其纳入 inference scaling 阅读清单；如果实验过于 cherry-picked，降级为参考。</p>
+</section>
+
+<section style="background:#ffffff; border:1px solid #e2e8f0; padding:14px 18px; margin:16px 0; border-radius:6px;">
+  <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1em;"><span class="section-mark secondary">👀</span>值得知道但暂不主推</h3>
+  <ul style="color:#334155; margin:0; padding-left:20px; line-height:1.9;">
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.19220/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/40p6b-tJjwc6fKO-x1dEPu1V6Ga5gdVLEj37S67mdCI=449" target="_blank"><strong>Nemotron-Cascade 2</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDIiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiI3Y2UxMzJjMjAwYTAxMzlkM2JjZWU1NGM1NjdlMDc5ODhkYTk2MGExIiwidiI6MX0.R-wgkv0oE2qxNHFihAwOrpNt0Uvyj_P2Idj2i56IHTM/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/HeUhtdcE7lTQ0qW61BChLFN2x_szmNvb0Ny7zxLdSAQ=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDIiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiI3Y2UxMzJjMjAwYTAxMzlkM2JjZWU1NGM1NjdlMDc5ODhkYTk2MGExIiwidiI6MX0.hg1uI0CNPBMSXT_sHUiatZwF9fJDE_Z1-fKZyz9pmLk/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/A69dxkEiEBteLMPvtBgSAVGv59L2cWdMMUXeoUYMick=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDIiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiN2NlMTMyYzIwMGEwMTM5ZDNiY2VlNTRjNTY3ZTA3OTg4ZGE5NjBhMSIsInYiOjF9.twK5HqL7gweG0MdIAEjoj-Id4QVXgxHu-Bq6TIaKpBY/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/Ntvgewpi-E8QuRdtmHw3lVuPreBBFBjG49BDUzL_cjU=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">Cascade RL + on-policy distillation 的组合在工程上有参考价值，但"SOTA across diverse benchmarks"这类表述没有给出足够的方法论新意，更像是 NVIDIA 的技术报告而非研究突破。</div></li>
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.17541/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/MTTmuOhTfIL6L84H06Mj_6jCfH8hAiF9czyAtwz6eNU=449" target="_blank"><strong>Temporal Gains, Spatial Costs</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDQiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiIzZmU1YzdkNmYyNTU4NDUzYjYzODdhYzAwZTBjNjU2ZTRiMjI0YzM2IiwidiI6MX0.-CNrfMJnpDaPam-eV0YyKijyd1RLu7j3LF8__PnI-AI/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/pUxAqHoSlMm0aio_Nb3NILdEo06Qq5eAvqBRRKwahJc=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDQiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiIzZmU1YzdkNmYyNTU4NDUzYjYzODdhYzAwZTBjNjU2ZTRiMjI0YzM2IiwidiI6MX0.mbkL2pJpuPp3qhAUmcn-YaHZWBeRk-mO6cF-2CVz0m8/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/VD-LA-z9_y_4GEofKCzeIU0Idcv8bdZQS6bXWOlJVV0=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDQiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiM2ZlNWM3ZDZmMjU1ODQ1M2I2Mzg3YWMwMGUwYzY1NmU0YjIyNGMzNiIsInYiOjF9.v0xR5PH3h5-LLgoL7iNSdH-4zcsID8A1kiuCWlZPHWs/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/-8b2Z-PosDB_MZJB0YAJMz1Oso_TCuHqEvzk_IVW6E8=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">发现 video fine-tuning 会损害静态图像理解这一 trade-off 是有用的负面结果，但缺乏解决方案，属于诊断性工作，对多模态团队有参考意义但不值得深读。</div></li>
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.19203/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/WisnWr5f6CWLqEHh-LF4q66rXYr_Mwn90UjW93mcC7s=449" target="_blank"><strong>Tinted Frames: Question Framing Blinds VLMs</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDYiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiI2ZGUwNmQxOWVlNGIyOTdhODcyYzQ3YWZlZmM2NWE2ZmEwOGZmMjRiIiwidiI6MX0.Ypa4FD0P04Ieh5WtiVyKGvsUVT-raedLA7Qw1p-GudI/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/-_-zpMIxLUk4N5O1KrSs8TQmsIZ6H5unHoFvW0rSvXc=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDYiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiI2ZGUwNmQxOWVlNGIyOTdhODcyYzQ3YWZlZmM2NWE2ZmEwOGZmMjRiIiwidiI6MX0.PHdGYJ41tB4WhKcgjmV2CZYdf_iIcqPzOciq5I9p6Oo/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/yJV4JCmJ_l7D38VuoNbrccwfvpqVuRAEPGMdgw27aeg=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDYiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiNmRlMDZkMTllZTRiMjk3YTg3MmM0N2FmZWZjNjVhNmZhMDhmZjI0YiIsInYiOjF9.Z5i9MUuV1eEngn3O2QIl7y_fOltL-0oWS7pW5u61Dw0/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/SrF3_bWjhNBaJ9rAl7LLkHg89n0HgQ0QWWdLPD8Nhg4=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">VLM 对 question framing 敏感是已知问题，这篇的贡献在于系统化 benchmark 构建，但没有提供解释或修复路径，实用性有限。</div></li>
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.18743/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/uIkvPYhWH5yvgSCWOrdOPS1bsVuVhTZoI94XrUVu4AY=449" target="_blank"><strong>Memento-Skills</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDEiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiIyODU5YWY4YjdlMDQzOTdlNjVlNzhiZjc3YWQ3NjUxZTAyYTg3MjZhIiwidiI6MX0.5oZDg2weH9lGoXsmGrsSKJkPyZ78MHWkTMK9Am47J5k/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/cuUqPkLOMBcRsAstWo053RNPsxUh8aCv-uihA8bUkyo=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDEiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiIyODU5YWY4YjdlMDQzOTdlNjVlNzhiZjc3YWQ3NjUxZTAyYTg3MjZhIiwidiI6MX0.ca5giLA8z7-D9X5ws2aqy5USlLXsm60ZOOLXAm5eqR4/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/aHg2mLfIrDdEnTLbjoJfpLtsUxdAHd_4WkHWNMpfnYo=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDEiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiMjg1OWFmOGI3ZTA0Mzk3ZTY1ZTc4YmY3N2FkNzY1MWUwMmE4NzI2YSIsInYiOjF9.yg6tXNLf30kEYL-ETpS_Aahti8rIsULKodStw7YESHQ/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/_P2rdC_p9C1zDYWiHcumaNzmkurEzFgI9Xwzrcrr5pk=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">case-based reasoning + memory-augmented skill evolution 的思路有趣，但 agent 自设计 agent 的框架需要更严格的 evaluation，目前看更像系统论文而非研究突破。</div></li>
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.17662/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/qqR_UI2tjtvqZKNX_jGxml5ku9IN0cVfm5PNH4skkLM=449" target="_blank"><strong>FINER</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDgiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiJjNzE5NGY0YTI4MTA4NjM1NDQ5MTFhNmU0NTlhZTcwZTUyOTMyZTgyIiwidiI6MX0.lrgK3kRoE1MkWbvUNePSpdTd9gyvaiZ8h_i2HalBx84/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/3dS_aR6j3tFCPeA9fe2BNoPzL4Qk1IJ1Q_n79YwkxpU=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDgiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiJjNzE5NGY0YTI4MTA4NjM1NDQ5MTFhNmU0NTlhZTcwZTUyOTMyZTgyIiwidiI6MX0.SBBY2IJ7PjLJmWod0ofz7JehV_1aMuZ31SDroZT45hA/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/6VgspVm4G6qWUje702DVORE7C24LqJ0KCMgn9BPfo_o=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDgiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiYzcxOTRmNGEyODEwODYzNTQ0OTExYTZlNDU5YWU3MGU1MjkzMmU4MiIsInYiOjF9.9NBx3an2zSnVTm4Q2T1f4H6NSaKx51_HohRg0iWHgmw/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/7uyz4lIOIg17Bv75cCAhwefqNKb5A1FaqnS-hmI_dyg=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">CVPR 2026 工作，细粒度负样本查询下的 MLLM 幻觉是真实问题，但 benchmark 贡献类论文对方法研究的驱动力有限，除非团队正在做 MLLM 评估。</div></li>
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.14935/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/WqQm1KHTvRvajaRRVPj3C_ccfz1uNgO84dk4cGsFtck=449" target="_blank"><strong>Video-CoE</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDciLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiJhYzlkYWVhMjM5NGNjYTI5Zjc5YjJiZjRlNjMwZGFkZTMzM2E0MjYxIiwidiI6MX0.TQ1v_RuZJr2VyfKgPTGUvi3hmV_N4xaO5QJp-9RWgI0/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/0g2H9Ln4qyg9OPUib2mO8MYjE1wJ9L3B_wzr-hWti7Q=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDciLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiJhYzlkYWVhMjM5NGNjYTI5Zjc5YjJiZjRlNjMwZGFkZTMzM2E0MjYxIiwidiI6MX0.7V4U-snos-jT9TXfqPszkFyyHwPuXkdfEIBDUKbju-M/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/JmJyubAEUPLYVZs6Pbak7y2N1MywiBwkEJrpJkPL1fQ=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDciLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiYWM5ZGFlYTIzOTRjY2EyOWY3OWIyYmY0ZTYzMGRhZGUzMzNhNDI2MSIsInYiOjF9.0P-XuAqYCAkRe94dTM2_9gwUI1ZujfL4QdLfSMXAz2E/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/fcEiQpiFiXVhl3oAs8igsEEPSFs7ErOxiTTrZOtfQ4k=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">将 chain-of-thought 移植到视频事件预测是合理想法，但自监督 future event inference 在 video 领域已有大量工作，需要看清楚差异化贡献才值得深入。</div></li>
+    <li class="pf-brief-item"><div class="pf-brief-title"><a href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Farxiv.org%2Fabs%2F2603.13033/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/uAJ16Szp7FM73k5VPytrBSGNxkPZeXSkgUGy-1Xz1LQ=449" target="_blank"><strong>ESPIRE</strong></a></div><div class="pf-feedback-row"><span class="pf-feedback-actions"><a class="pf-feedback-btn positive" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDkiLCJsYWJlbCI6InBvc2l0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiIwZjY1ZmM4ZjcxYTY1MzAyYTE5YmU3YWZhZDc3MGVjYTljMGZmY2ZhIiwidiI6MX0.CdeghYboehRnLSvT3cdjqk72Et8qUF21PHT3bf2M3X8/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/7nn0NFVu4iTE69TD4s3TDELIZIh579PjHBDc-JhgOA4=449" target="_blank">👍 Positive</a> <a class="pf-feedback-btn negative" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDkiLCJsYWJlbCI6Im5lZ2F0aXZlIiwicmV2aWV3ZXIiOiJnYW94aW4yM0BtLmZ1ZGFuLmVkdS5jbiIsInJ1bl9pZCI6IjIwMjYtMDMtMjFUMTUtNTItMjhaIiwic2VtYW50aWNfcGFwZXJfaWQiOiIwZjY1ZmM4ZjcxYTY1MzAyYTE5YmU3YWZhZDc3MGVjYTljMGZmY2ZhIiwidiI6MX0.z8aWH_vZlz6TpZHe8iOtQ9TB0gdzpujVO_WRc6poRG8/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/8-i87lHmGnE2WrMUZaIv9ym3aZSjACKPoXj_LMs08tM=449" target="_blank">👎 Negative</a> <a class="pf-feedback-btn undecided" href="https://us-east-1.resend-clicks.com/CL0/https:%2F%2Fpaperfeeder-feedback.paperfeeder-feedback.workers.dev%2Ffeedback%3Ft=eyJleHAiOiIyMDI2LTAzLTI4VDE1OjUyOjI4WiIsIml0ZW1faWQiOiJwMDkiLCJsYWJlbCI6InVuZGVjaWRlZCIsInJldmlld2VyIjoiZ2FveGluMjNAbS5mdWRhbi5lZHUuY24iLCJydW5faWQiOiIyMDI2LTAzLTIxVDE1LTUyLTI4WiIsInNlbWFudGljX3BhcGVyX2lkIjoiMGY2NWZjOGY3MWE2NTMwMmExOWJlN2FmYWQ3NzBlY2E5YzBmZmNmYSIsInYiOjF9.NgrJ2I7V-r__Av9Xi4TogPF5vXZhxTe1VALztcuayos/1/0100019d11192f29-f0d71d05-9af8-46f0-815b-129e341270e0-000000/bqFzSEvMrzWJGGKIDbBLXlMmDePLxtcYvl3spEMDYvg=449" target="_blank">🤔 Undecided</a></span></div><div class="pf-brief-comment">具身空间推理 benchmark，对做 embodied AI 的团队有参考价值，但纯 diagnostic benchmark 而无新方法，不在本团队优先级内。</div></li>
+  </ul>
+</section>
+
+<h2><span class="section-mark judgment">📝</span>今日判断摘要</h2>
+
+<ul style="color:#1e293b; line-height:2; padding-left:20px;">
+  <li>今日最值得警惕的洞见来自 <em>Alignment Makes LMs Normative</em>——如果论证成立，将系统性质疑当前大量依赖对齐模型输出的研究范式（LLM-as-judge、合成数据、agent simulation）。</li>
+  <li>OpenAI 的 CoT 监控博客是少见的"生产级 alignment 实践"一手资料，安全/alignment 方向团队不应错过。</li>
+  <li><em>Efficient Reasoning with Balanced Thinking</em> 触及 inference scaling 的核心工程问题，但社区零信号，需带怀疑态度快速验证实验质量再决定是否深入。</li>
+  <li>本轮论文池整体偏向 benchmark 构建和多模态调优细节，范式级工作缺席，下轮筛选建议提高对"新方法"的准入门槛。</li>
+</ul>
+            </div>
+            <div class="footer">
+                PaperFeeder · alignment, large language model, llm, reasoning
+                <div class="footer-note">注：如果论文没有 Semantic Scholar ID，则不会显示 Like / Dislike feedback。</div>
+            </div>
+        </div>
+    </body>
+    </html>

@@ -480,7 +480,26 @@ async def run_pipeline(
                 # Same HTML as web/D1: per-paper 👍/👎 links must appear in email too (many clients ignore <script>).
                 web_report = inject_feedback_actions_into_report(report, str(manifest_path))
                 web_report = append_feedback_fallback_strip(web_report, str(manifest_path))
-                email_report = make_email_safe_report_html(web_report)
+                try:
+                    from paperfeeder.pipeline.summarizer import PaperSummarizer
+
+                    email_summarizer = PaperSummarizer(
+                        api_key=getattr(config, "llm_api_key", "") or "",
+                        base_url=getattr(config, "llm_base_url", None),
+                        model=getattr(config, "llm_model", "claude-3-5-sonnet-20241022"),
+                        research_interests=getattr(config, "research_interests", ""),
+                        prompt_addon=getattr(config, "prompt_addon", ""),
+                        prompt_language=getattr(config, "prompt_language", "zh-CN"),
+                        debug_save_pdfs=getattr(config, "debug_save_pdfs", False),
+                        debug_pdf_dir=getattr(config, "debug_pdf_dir", "debug_pdfs"),
+                        pdf_max_pages=getattr(config, "pdf_max_pages", 10),
+                    )
+                    email_report = make_email_safe_report_html(
+                        email_summarizer.rewrap_existing_report_html(web_report)
+                    )
+                except Exception as exc:
+                    print(f"   Email template rewrap failed, falling back to raw feedback HTML: {exc}")
+                    email_report = make_email_safe_report_html(web_report)
                 try:
                     publish_feedback_run_to_d1(
                         manifest_path=str(manifest_path),

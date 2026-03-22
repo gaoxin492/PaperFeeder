@@ -50,3 +50,6 @@ tests/debug_sample.json
 debug_sample.json
 wrangler.toml
 
+template_preview.html
+template_preview1.html
+today.html

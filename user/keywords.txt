@@ -10,7 +10,6 @@ mechanistic interpretability
 test-time compute
 inference scaling
 test time training
-formal language reasoning
 verifiable coding agent
 AI safety
 alignment
@@ -20,3 +19,5 @@ LLM
 Large Language Model
 Scaling Law
 Foundation Model
+Multimodal
+Multi-modal
