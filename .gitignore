@@ -35,10 +35,12 @@ semantic_feedback_queue.json
 # Local agent/workflow artifacts
 .codex/
 openspec/
+.wrangler/
+cloudflare/.wrangler/
 
-# Keep tests tracked
-!tests/
-!tests/*.py
+
+tests/
+tests/*.py
 
 # OS
 .DS_Store
@@ -49,9 +51,9 @@ Thumbs.db
 tests/
 tests/debug_sample.json
 debug_sample.json
-wrangler.toml
 
 template_preview.html
 template_preview1.html
 template_preview2.html
 today.html
+
