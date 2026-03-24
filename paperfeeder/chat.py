@@ -439,3 +439,4 @@ def qwen_client(api_key: str, model: str = "qwen-turbo") -> LLMClient:
 
 def local_client(base_url: str = "http://localhost:11434/v1", model: str = "llama3") -> LLMClient:
     return LLMClient(base_url=base_url, model=model)
+

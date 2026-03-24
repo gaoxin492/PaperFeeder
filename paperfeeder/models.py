@@ -109,3 +109,4 @@ class DailyReport:
     summary: str
     insights: List[str]
     html_content: str
+

@@ -149,3 +149,4 @@ class FileEmailer(BaseEmailer):
         except Exception as exc:
             print(f"Error saving email: {exc}")
             return False
+
