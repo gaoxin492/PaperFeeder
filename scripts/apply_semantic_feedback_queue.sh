@@ -46,3 +46,4 @@ fi
 
 echo "▶ Running: ${CMD[*]}"
 "${CMD[@]}"
+

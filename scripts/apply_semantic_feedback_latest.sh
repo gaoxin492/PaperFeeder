@@ -40,3 +40,4 @@ if [[ "${DRY_RUN_FLAG}" == "--dry-run" ]]; then
 fi
 
 exec ./scripts/apply_semantic_feedback.sh "${LATEST_MANIFEST}" "${FEEDBACK_FILE}" "${SEEDS_FILE}"
+
