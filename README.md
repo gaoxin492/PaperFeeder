@@ -281,3 +281,4 @@ The dominant cost is the synthesis step, which only processes the final shortlis
 - `artifacts/` and `llm_filter_debug/` are disposable runtime outputs; safe to delete.
 - `state/semantic/` holds live runtime state; don't delete unless intentionally resetting.
 - On GitHub Actions, `memory.json` and `seeds.json` live on the state branch, not on `main`.
+
