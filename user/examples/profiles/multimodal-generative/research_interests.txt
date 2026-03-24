@@ -9,3 +9,4 @@ Prefer:
 Avoid:
 - Pure application demos
 - Narrow vertical pipelines without a reusable technique
+

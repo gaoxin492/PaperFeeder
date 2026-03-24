@@ -10,3 +10,4 @@ Avoid:
 - Incremental leaderboard gains without a clear idea
 - Pure productized applications
 - Narrow domain papers without a reusable method
+
