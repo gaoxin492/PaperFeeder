@@ -20,3 +20,4 @@ Instant pass:
 - Engineering-heavy work without a general insight
 - Resource dumps with little analysis
 - Bio, medical, or physics applications unless they introduce a broadly useful ML advance
+

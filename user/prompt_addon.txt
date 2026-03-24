@@ -4,3 +4,4 @@ When suggesting papers/blogs:
 - Explicitly say why it matters now
 - Mention concrete risks or failure modes when relevant
 - Prefer actionable next steps over generic praise
+
