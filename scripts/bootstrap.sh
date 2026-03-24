@@ -44,3 +44,4 @@ echo "Next steps:"
 echo "  1) Edit .env and add your API keys"
 echo "  2) Edit config.yaml and user/ files (blogs, research_interests, keywords, categories)"
 echo "  3) Run: source $VENV_DIR/bin/activate && python main.py --dry-run"
+

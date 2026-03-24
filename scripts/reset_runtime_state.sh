@@ -10,3 +10,4 @@ fi
 
 cd "$ROOT_DIR"
 exec "$PYTHON_BIN" -m paperfeeder.cli.reset_runtime_state "$@"
+
