@@ -210,3 +210,4 @@ class SemanticMemoryStore:
         removed = len(self.state.seen) - len(kept)
         self.state.seen = kept
         return removed
+

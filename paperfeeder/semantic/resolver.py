@@ -281,3 +281,4 @@ class SemanticPaperResolver:
             overlap_ok = bool(input_authors & cand_authors)
 
         return year_ok or overlap_ok
+
