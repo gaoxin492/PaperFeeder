@@ -6,3 +6,4 @@ pyyaml>=6.0
 python-dotenv>=1.0.0
 pymupdf>=1.24.0  # PDF text extraction (optional)
 feedparser
+
