@@ -121,6 +121,7 @@ class Config:
     semantic_scholar_enabled: bool = False
     semantic_scholar_api_key: str = ""
     semantic_scholar_max_results: int = 30
+    semantic_state_backend: str = "file"
     semantic_scholar_seeds_path: str = DEFAULT_SEMANTIC_SEEDS_PATH
     semantic_memory_enabled: bool = True
     semantic_memory_path: str = DEFAULT_SEMANTIC_MEMORY_PATH
@@ -208,6 +209,7 @@ class Config:
             "semantic_scholar_enabled": os.getenv("SEMANTIC_SCHOLAR_ENABLED"),
             "semantic_scholar_api_key": os.getenv("SEMANTIC_SCHOLAR_API_KEY"),
             "semantic_scholar_max_results": os.getenv("SEMANTIC_SCHOLAR_MAX_RESULTS"),
+            "semantic_state_backend": os.getenv("SEMANTIC_STATE_BACKEND"),
             "semantic_scholar_seeds_path": os.getenv("SEMANTIC_SCHOLAR_SEEDS_PATH"),
             "semantic_memory_enabled": os.getenv("SEMANTIC_MEMORY_ENABLED"),
             "semantic_memory_path": os.getenv("SEMANTIC_MEMORY_PATH"),

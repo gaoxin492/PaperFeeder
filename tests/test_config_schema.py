@@ -41,6 +41,26 @@ class FeedbackWebViewerFromYamlTests(unittest.TestCase):
             c = Config.from_yaml(str(cfg))
             self.assertFalse(c.feedback_web_viewer_link_in_email)
 
+    def test_semantic_state_backend_env_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.yaml"
+            cfg.write_text(
+                "semantic_state_backend: file\n"
+                "email_to: x@y.z\n",
+                encoding="utf-8",
+            )
+            old_backend = os.environ.get("SEMANTIC_STATE_BACKEND")
+            os.environ["SEMANTIC_STATE_BACKEND"] = "d1"
+            try:
+                loaded = Config.from_yaml(str(cfg))
+            finally:
+                if old_backend is None:
+                    os.environ.pop("SEMANTIC_STATE_BACKEND", None)
+                else:
+                    os.environ["SEMANTIC_STATE_BACKEND"] = old_backend
+
+            self.assertEqual(loaded.semantic_state_backend, "d1")
+
 
 class UserPersonalizationFileTests(unittest.TestCase):
     def test_user_list_files_override_defaults(self) -> None:

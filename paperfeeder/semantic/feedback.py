@@ -1102,6 +1102,19 @@ def apply_feedback_d1_to_seeds(
     if not acc or not tok or not dbid:
         raise ValueError("Missing D1 credentials (account_id/api_token/database_id)")
 
+    from .state_store import export_semantic_state, import_semantic_state, resolve_semantic_state_backend
+
+    if resolve_semantic_state_backend() == "d1":
+        export_semantic_state(
+            memory_path="state/semantic/memory.json",
+            seeds_path=seeds_path,
+            include_memory=False,
+            include_seeds=True,
+            account_id=acc,
+            api_token=tok,
+            database_id=dbid,
+        )
+
     where = "status='pending'"
     if run_id_filter:
         where += f" AND run_id={_sql_quote(run_id_filter)}"
@@ -1196,6 +1209,16 @@ def apply_feedback_d1_to_seeds(
 
     if not dry_run:
         Path(seeds_path).write_text(json.dumps(output, indent=2) + "\n")
+        if resolve_semantic_state_backend() == "d1":
+            import_semantic_state(
+                memory_path="state/semantic/memory.json",
+                seeds_path=seeds_path,
+                include_memory=False,
+                include_seeds=True,
+                account_id=acc,
+                api_token=tok,
+                database_id=dbid,
+            )
         for e in rows:
             event_id = str(e.get("event_id", ""))
             if not event_id:

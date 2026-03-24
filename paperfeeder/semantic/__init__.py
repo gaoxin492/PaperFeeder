@@ -18,6 +18,14 @@ from .feedback import (
 )
 from .memory import SemanticMemoryStore, memory_keys_for_paper, normalize_memory_url
 from .resolver import SemanticPaperResolver
+from .state_store import (
+    export_semantic_state,
+    import_semantic_state,
+    open_file_in_editor,
+    reset_semantic_memory_d1,
+    reset_semantic_seeds_d1,
+    resolve_semantic_state_backend,
+)
 
 __all__ = [
     "SemanticMemoryStore",
@@ -38,7 +46,13 @@ __all__ = [
     "normalize_memory_url",
     "publish_feedback_run_to_d1",
     "queue_feedback_event",
+    "export_semantic_state",
+    "import_semantic_state",
+    "open_file_in_editor",
     "reset_feedback_d1_state",
+    "reset_semantic_memory_d1",
+    "reset_semantic_seeds_d1",
+    "resolve_semantic_state_backend",
     "verify_feedback_token",
 ]
 

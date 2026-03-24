@@ -21,3 +21,11 @@ CREATE TABLE IF NOT EXISTS feedback_runs (
   report_html TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS semantic_state (
+  state_key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_semantic_state_updated_at ON semantic_state(updated_at);
+

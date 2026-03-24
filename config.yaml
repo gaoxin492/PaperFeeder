@@ -37,6 +37,7 @@ blog_days_back: 7
 max_blog_posts: 3
 
 # State paths
+semantic_state_backend: "d1"
 semantic_scholar_seeds_path: "state/semantic/seeds.json"
 semantic_memory_enabled: true
 semantic_memory_path: "state/semantic/memory.json"

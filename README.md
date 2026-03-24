@@ -61,8 +61,8 @@ If `LLM_FILTER_*` is not set, the synthesis model handles filtering too.
 
 | State | Location | Purpose |
 |-------|----------|---------|
-| Short-term memory | `state/semantic/memory.json` | suppress recently seen papers (TTL-based dedup) |
-| Long-term preferences | `state/semantic/seeds.json` | positive/negative Semantic Scholar seed IDs |
+| Short-term memory | Cloudflare D1 + `state/semantic/memory.json` | D1 is the remote source of truth; local JSON is an editable/exportable mirror |
+| Long-term preferences | Cloudflare D1 + `state/semantic/seeds.json` | D1 is the remote source of truth; local JSON is an editable/exportable mirror |
 | Per-run artifacts | `artifacts/` | feedback manifests and review templates per run |
 | Remote feedback queue | Cloudflare D1 | stores pending 👍/👎 events before applying to seeds |
 
@@ -70,14 +70,14 @@ The two state files serve different purposes:
 - `memory.json` — "already shown recently, skip for now"
 - `seeds.json` — "recommend more/less of this kind of paper going forward"
 
-On GitHub Actions, both files are persisted to a dedicated `memory-state` branch (not `main`).
+Operationally, D1 is the shared remote state. Local files are working copies that you export, edit, import, or reset on demand.
 
 ### Feedback Loop
 
 ```
 Daily digest → reader clicks 👍/👎 in email or web viewer
 → Cloudflare Worker stores event in D1
-→ apply-feedback-queue.yml merges events into seeds.json
+→ apply-feedback-queue.yml merges events into D1-backed seeds state
 → future Semantic Scholar recommendations shift accordingly
 ```
 
@@ -89,7 +89,7 @@ PaperFeeder/
 │   ├── pipeline/          # Pipeline stages (runner, filters, researcher, summarizer)
 │   ├── sources/           # Paper and blog fetchers (arXiv, HF, Semantic Scholar, RSS)
 │   ├── semantic/          # Memory store, feedback export, link signing
-│   ├── cli/               # CLI commands (apply_feedback, reset_runtime_state)
+│   ├── cli/               # CLI commands (apply_feedback, export_state, import_state, reset_memory)
 │   ├── config/            # Config loading and schema
 │   ├── chat.py            # OpenAI-compatible LLM client
 │   └── email.py           # Email backends (Resend, SendGrid, file, console)
@@ -182,6 +182,38 @@ python -m paperfeeder.cli.apply_feedback \
   --from-d1 --manifests-dir artifacts --dry-run
 ```
 
+Manage D1-backed semantic state locally:
+
+```bash
+# Pull the latest remote state into local JSON mirrors
+./scripts/export-state
+
+# Edit long-term recommendation seeds locally
+./scripts/edit-seeds
+
+# Push local JSON mirrors back into D1
+./scripts/import-state
+
+# Clear short-term memory locally and in D1
+./scripts/reset-memory --yes
+```
+
+Equivalent Python modules are also available if you prefer explicit entrypoints:
+
+```bash
+python -m paperfeeder.cli.export_state
+python -m paperfeeder.cli.edit_seeds
+python -m paperfeeder.cli.import_state
+python -m paperfeeder.cli.reset_memory --yes
+```
+
+Recommended workflow:
+
+1. Run `./scripts/export-state` before inspecting or editing semantic state.
+2. Use `./scripts/edit-seeds` to open `state/semantic/seeds.json` locally.
+3. Run `./scripts/import-state --only seeds` after editing seeds.
+4. Run `./scripts/reset-memory --yes` when you want a clean short-term memory window.
+
 Reset local runtime state:
 
 ```bash
@@ -239,21 +271,21 @@ All secrets go under **Settings → Secrets and variables → Actions → Reposi
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SEED_STATE_BRANCH` | `memory-state` | branch to persist `memory.json` and `seeds.json` |
+| `SEMANTIC_STATE_BACKEND` | `d1` | semantic state backend (`d1` or `file`) |
 | `SEMANTIC_MEMORY_ENABLED` | `true` | enable/disable anti-repetition memory |
 | `SEMANTIC_SEEN_TTL_DAYS` | `30` | how long seen papers are suppressed |
 | `SEMANTIC_MEMORY_MAX_IDS` | `5000` | cap on memory store size |
 | `FEEDBACK_TOKEN_TTL_DAYS` | — | expiry for signed feedback links |
 | `FEEDBACK_REVIEWER` | — | reviewer ID stamped on feedback events |
 
-### State Branch
+### Remote Semantic State
 
-Workflows never write back to `main`. Runtime state is persisted to a separate branch (default: `memory-state`):
+Workflows never write runtime state back to `main`. Instead:
 
-- `daily-digest.yml` — reads `memory.json` + `seeds.json` at start; writes `memory.json` at end
-- `apply-feedback-queue.yml` — reads `seeds.json` at start; writes `seeds.json` at end
+- `daily-digest.yml` exports semantic state from D1 before the run and re-imports updated `memory.json` after the run
+- `apply-feedback-queue.yml` exports seeds from D1 before applying feedback and re-imports updated `seeds.json` after the run
 
-On first run the branch is created automatically with empty state files.
+That keeps Git history clean while still letting humans inspect and edit local JSON copies when needed.
 
 ### First Deployment Checklist
 
@@ -261,7 +293,7 @@ On first run the branch is created automatically with empty state files.
 2. Add all required secrets under **Repository secrets** (not under an Environment)
 3. Set optional Variables as needed
 4. Manually trigger **Daily Paper Digest** with `dry_run=true` — inspect logs and artifacts
-5. Run once with `dry_run=false` — confirm email arrives and `memory-state` branch is created
+5. Run once with `dry_run=false` — confirm email arrives and D1-backed semantic state round-trips cleanly
 6. *(Full feedback loop only)* Deploy the Cloudflare Worker, then verify `apply-feedback-queue.yml` runs cleanly
 
 ### Cost Estimate

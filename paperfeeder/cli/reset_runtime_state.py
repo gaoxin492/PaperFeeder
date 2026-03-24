@@ -13,7 +13,7 @@ except ImportError:  # pragma: no cover - import-time fallback for lightweight e
     def load_dotenv(*_args, **_kwargs):
         return False
 
-from paperfeeder.semantic.feedback import reset_feedback_d1_state
+from paperfeeder.semantic import reset_feedback_d1_state, reset_semantic_memory_d1, reset_semantic_seeds_d1
 
 
 def load_cli_env() -> bool:
@@ -71,12 +71,24 @@ def main() -> int:
         queue_path = None if args.skip_queue else reset_feedback_queue_file(args.queue_file)
         seeds_path = reset_semantic_seeds_file(args.seeds_file) if args.with_seeds else None
         d1_result = None
+        d1_state_result = None
         if args.with_d1:
             d1_result = reset_feedback_d1_state(
                 account_id=args.cloudflare_account_id or None,
                 api_token=args.cloudflare_api_token or None,
                 database_id=args.d1_database_id or None,
             )
+            d1_state_result = reset_semantic_memory_d1(
+                account_id=args.cloudflare_account_id or None,
+                api_token=args.cloudflare_api_token or None,
+                database_id=args.d1_database_id or None,
+            )
+            if args.with_seeds:
+                reset_semantic_seeds_d1(
+                    account_id=args.cloudflare_account_id or None,
+                    api_token=args.cloudflare_api_token or None,
+                    database_id=args.d1_database_id or None,
+                )
     except Exception as exc:
         print(f"Reset failed: {exc}")
         return 1
@@ -96,6 +108,10 @@ def main() -> int:
         print(f"   d1_database_id: {d1_result['database_id']}")
         print(f"   d1_events_deleted: {d1_result['events_deleted']}")
         print(f"   d1_runs_deleted: {d1_result['runs_deleted']}")
+        if d1_state_result:
+            print("   d1_memory: cleared")
+            if args.with_seeds:
+                print("   d1_seeds: cleared")
     else:
         print("   d1: not requested")
     return 0

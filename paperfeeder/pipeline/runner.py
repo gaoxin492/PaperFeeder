@@ -15,13 +15,48 @@ from paperfeeder.models import Paper, PaperSource
 from paperfeeder.semantic import (
     SemanticMemoryStore,
     append_feedback_fallback_strip,
+    export_semantic_state,
     export_run_feedback_manifest,
+    import_semantic_state,
     inject_feedback_actions_into_report,
     make_email_safe_report_html,
     memory_keys_for_paper,
     normalize_memory_url,
     publish_feedback_run_to_d1,
+    resolve_semantic_state_backend,
 )
+
+
+def _sync_semantic_state_from_d1(config: Config, *, include_memory: bool, include_seeds: bool) -> bool:
+    backend = resolve_semantic_state_backend(getattr(config, "semantic_state_backend", "file"))
+    if backend != "d1":
+        return False
+    export_semantic_state(
+        memory_path=getattr(config, "semantic_memory_path", "state/semantic/memory.json"),
+        seeds_path=getattr(config, "semantic_scholar_seeds_path", "state/semantic/seeds.json"),
+        include_memory=include_memory,
+        include_seeds=include_seeds,
+        account_id=getattr(config, "cloudflare_account_id", "") or None,
+        api_token=getattr(config, "cloudflare_api_token", "") or None,
+        database_id=getattr(config, "d1_database_id", "") or None,
+    )
+    return True
+
+
+def _sync_semantic_state_to_d1(config: Config, *, include_memory: bool, include_seeds: bool) -> bool:
+    backend = resolve_semantic_state_backend(getattr(config, "semantic_state_backend", "file"))
+    if backend != "d1":
+        return False
+    import_semantic_state(
+        memory_path=getattr(config, "semantic_memory_path", "state/semantic/memory.json"),
+        seeds_path=getattr(config, "semantic_scholar_seeds_path", "state/semantic/seeds.json"),
+        include_memory=include_memory,
+        include_seeds=include_seeds,
+        account_id=getattr(config, "cloudflare_account_id", "") or None,
+        api_token=getattr(config, "cloudflare_api_token", "") or None,
+        database_id=getattr(config, "d1_database_id", "") or None,
+    )
+    return True
 
 
 async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
@@ -31,6 +66,17 @@ async def fetch_papers(config: Config, days_back: int = 1) -> List[Paper]:
     memory_store = None
 
     setattr(config, "_semantic_memory_store", None)
+    if getattr(config, "semantic_memory_enabled", True) or getattr(config, "semantic_scholar_enabled", False):
+        try:
+            synced = _sync_semantic_state_from_d1(
+                config,
+                include_memory=getattr(config, "semantic_memory_enabled", True),
+                include_seeds=getattr(config, "semantic_scholar_enabled", False),
+            )
+            if synced:
+                print("      Loaded semantic state from D1")
+        except Exception as exc:
+            print(f"      Semantic state export from D1 failed, using local files: {exc}")
     if getattr(config, "semantic_memory_enabled", True):
         memory_store = SemanticMemoryStore(
             path=getattr(config, "semantic_memory_path", "state/semantic/memory.json"),
@@ -173,6 +219,11 @@ def update_semantic_memory_from_report(final_papers: List[Paper], report_html: s
         memory_store.mark_seen(visible_keys)
         removed = memory_store.prune_expired(getattr(config, "semantic_seen_ttl_days", 30))
         memory_store.save()
+        try:
+            if _sync_semantic_state_to_d1(config, include_memory=True, include_seeds=False):
+                print("   Semantic memory persisted to D1")
+        except Exception as exc:
+            print(f"   Semantic memory D1 sync failed (non-blocking): {exc}")
         print(
             "   Semantic memory updated: "
             f"final_selected={len(final_memory_candidates)}, report_visible={len(visible_papers)}, "
